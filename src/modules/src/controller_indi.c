@@ -235,8 +235,8 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 		 * 1 - Update the gyro filter with the new measurements.
 		 */
 
-		body_rates.p = radians(sensors->gyro.x); 
-		body_rates.q = -radians(sensors->gyro.y); //Account for gyro measuring pitch rate in opposite direction relative to both the CF coords and INDI coords
+		body_rates.p = radians(sensors->gyro.x);  // (pitch-emma)
+		body_rates.q = -radians(sensors->gyro.y); //(roll-emma) Account for gyro measuring pitch rate in opposite direction relative to both the CF coords and INDI coords
 		body_rates.r = -radians(sensors->gyro.z); //Account for conversion of ENU -> NED
 
 		filter_pqr(indi.rate, &body_rates);

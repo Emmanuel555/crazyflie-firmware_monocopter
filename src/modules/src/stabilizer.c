@@ -180,7 +180,8 @@ void stabilizerInit(StateEstimatorType estimator)
 
   sensorsInit();
   stateEstimatorInit(estimator);
-  controllerInit(ControllerTypeAny);
+  // controllerInit(ControllerTypeAny); emma
+  controllerInit(ControllerTypeINDI);
   powerDistributionInit();
   motorsInit(platformConfigGetMotorMapping());
   collisionAvoidanceInit();
@@ -279,7 +280,7 @@ static void stabilizerTask(void* param)
 
       collisionAvoidanceUpdateSetpoint(&setpoint, &sensorData, &state, tick);
 
-      controller(&control, &setpoint, &sensorData, &state, tick);
+      controller(&control, &setpoint, &sensorData, &state, tick); // INDI controller function runs on this line
         
       control.thrust = setpoint.position.x;  
       control.thrust_2 = setpoint.position.y; 
@@ -378,6 +379,17 @@ PARAM_GROUP_STOP(stabilizer)
  *
  * Note: all members may not be updated depending on how the system is used
  */
+
+LOG_GROUP_START(control_scheme)
+
+/**
+ * @brief Controller type INDI
+ */
+LOG_ADD_CORE(LOG_UINT8, control_scheme_chosen, &controllerType)
+
+LOG_GROUP_STOP(control_scheme)
+
+
 LOG_GROUP_START(ctrltarget)
 
 /**
