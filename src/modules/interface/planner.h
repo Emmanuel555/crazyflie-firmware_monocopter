@@ -87,7 +87,7 @@ void plan_stop(struct planner *p);
 
 // query if the planner is stopped.
 // currently this is true at startup before we take off,
-// and also after a stop.
+// and also after an emergency stop.
 bool plan_is_stopped(struct planner *p);
 
 // disable the planner.
@@ -109,13 +109,10 @@ int plan_takeoff(struct planner *p, struct vec curr_pos, float curr_yaw, float h
 int plan_land(struct planner *p, struct vec curr_pos, float curr_yaw, float hover_height, float hover_yaw, float duration, float t);
 
 // move to a given position, then hover there.
-int plan_go_to(struct planner *p, bool relative, bool linear, struct vec hover_pos, float hover_yaw, float duration, float t);
+int plan_go_to(struct planner *p, bool relative, struct vec hover_pos, float hover_yaw, float duration, float t);
 
 // same as above, but with current state provided from outside.
-int plan_go_to_from(struct planner *p, const struct traj_eval *curr_eval, bool relative, bool linear, struct vec hover_pos, float hover_yaw, float duration, float t);
-
-// move along a spiral
-int plan_spiral_from(struct planner *p, const struct traj_eval *curr_eval, bool sideways, bool clockwise, float spiral_angle, float radius0, float radiusf, float ascent, float duration, float t);
+int plan_go_to_from(struct planner *p, const struct traj_eval *curr_eval, bool relative, struct vec hover_pos, float hover_yaw, float duration, float t);
 
 // start trajectory. start_from param is ignored if relative == false.
 int plan_start_trajectory(struct planner *p, struct piecewise_traj* trajectory, bool reversed, bool relative, struct vec start_from);

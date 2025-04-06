@@ -52,7 +52,7 @@ static void enumerateDecks(void);
 static void checkPeriphAndGpioConflicts(void);
 
 static void scanRequiredSystemProperties(void);
-static StateEstimatorType requiredEstimator = StateEstimatorTypeAutoSelect;
+static StateEstimatorType requiredEstimator = anyEstimator;
 static bool registerRequiredEstimator(StateEstimatorType estimator);
 static bool requiredLowInterferenceRadioMode = false;
 
@@ -370,9 +370,9 @@ static bool registerRequiredEstimator(StateEstimatorType estimator)
 {
   bool isError = false;
 
-  if (StateEstimatorTypeAutoSelect != estimator)
+  if (anyEstimator != estimator)
   {
-    if (StateEstimatorTypeAutoSelect == requiredEstimator)
+    if (anyEstimator == requiredEstimator)
     {
       requiredEstimator = estimator;
     }

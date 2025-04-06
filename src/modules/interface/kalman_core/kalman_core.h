@@ -93,12 +93,6 @@ typedef struct {
 
   // Quaternion used for initial orientation [w,x,y,z]
   float initialQuaternion[4];
-
-  // Tracks whether an update to the state has been made, and the state therefore requires finalization
-  bool isUpdated;
-
-  uint32_t lastPredictionMs;
-  uint32_t lastProcessNoiseUpdateMs;
 } kalmanCoreData_t;
 
 // The parameters used by the filter
@@ -135,7 +129,7 @@ typedef struct {
 void kalmanCoreDefaultParams(kalmanCoreParams_t *params);
 
 /*  - Initialize Kalman State */
-void kalmanCoreInit(kalmanCoreData_t *this, const kalmanCoreParams_t *params, const uint32_t nowMs);
+void kalmanCoreInit(kalmanCoreData_t *this, const kalmanCoreParams_t *params);
 
 /*  - Measurement updates based on sensors */
 
@@ -147,21 +141,15 @@ void kalmanCoreUpdateWithBaro(kalmanCoreData_t *this, const kalmanCoreParams_t *
  *
  * The filter progresses as:
  *  - Predicting the current state forward */
-void kalmanCorePredict(kalmanCoreData_t *this, Axis3f *acc, Axis3f *gyro, const uint32_t nowMs, bool quadIsFlying);
+void kalmanCorePredict(kalmanCoreData_t *this, Axis3f *acc, Axis3f *gyro, float dt, bool quadIsFlying);
 
-void kalmanCoreAddProcessNoise(kalmanCoreData_t *this, const kalmanCoreParams_t *params, const uint32_t nowMs);
+void kalmanCoreAddProcessNoise(kalmanCoreData_t *this, const kalmanCoreParams_t *params, float dt);
 
-/**
- * @brief Finalization to incorporate attitude error into body attitude
- *
- * @param this Core data
- * @return true The state was finalized
- * @return false The state was not changed and did not require finalization
- */
-bool kalmanCoreFinalize(kalmanCoreData_t* this);
+/*  - Finalization to incorporate attitude error into body attitude */
+void kalmanCoreFinalize(kalmanCoreData_t* this, uint32_t tick);
 
 /*  - Externalization to move the filter's internal state into the external state expected by other modules */
-void kalmanCoreExternalizeState(const kalmanCoreData_t* this, state_t *state, const Axis3f *acc);
+void kalmanCoreExternalizeState(const kalmanCoreData_t* this, state_t *state, const Axis3f *acc, uint32_t tick);
 
 void kalmanCoreDecoupleXY(kalmanCoreData_t* this);
 

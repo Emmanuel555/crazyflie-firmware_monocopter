@@ -1,5 +1,3 @@
-// @IGNORE_IF_NOT CONFIG_DECK_LIGHTHOUSE
-
 // File under test lighthouse_core.c
 #include "lighthouse_core.h"
 
@@ -14,9 +12,9 @@
 #include "mock_lighthouse_calibration.h"
 #include "mock_uart1.h"
 #include "mock_statsCnt.h"
+#include "mock_cfassert.h"
 #include "mock_crtp_localization_service.h"
 #include "mock_lighthouse_storage.h"
-#include "mock_lighthouse_throttle.h"
 
 #include <stdbool.h>
 
@@ -40,8 +38,6 @@ void vTaskDelay(const uint32_t ignore) {}
 
 static int nrOfCallsToStorageFetchForCalib = 0;
 static size_t mockStorageFetchForCalib(char* key, void* buffer, size_t length, int cmock_num_calls);
-
-static const uint32_t FRAME_LENGTH = 12;
 
 void setUp(void) {
     nrOfCallsToStorageFetchForCalib = 0;
@@ -76,8 +72,6 @@ void testThatUartSyncFramesAreSkipped() {
                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   int expectedRead = 24;
   uart1SetSequence(sequence, sizeof(sequence));
-  uart1bytesAvailable_ExpectAndReturn(FRAME_LENGTH);
-  uart1bytesAvailable_ExpectAndReturn(FRAME_LENGTH);
 
   // Test
   do {
@@ -95,7 +89,6 @@ void testThatCorruptUartFramesAreDetectedWithOnesInFirstPadding() {
   // Fixture
   unsigned char sequence[] = {0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0};
   uart1SetSequence(sequence, sizeof(sequence));
-  uart1bytesAvailable_ExpectAndReturn(FRAME_LENGTH);
 
   // Test
   bool actual = getUartFrameRaw(&frame);
@@ -109,7 +102,6 @@ void testThatCorruptUartFramesAreDetectedWithOnesInSecondPadding() {
   // Fixture
   unsigned char sequence[] = {0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0};
   uart1SetSequence(sequence, sizeof(sequence));
-  uart1bytesAvailable_ExpectAndReturn(FRAME_LENGTH);
 
   // Test
   bool actual = getUartFrameRaw(&frame);
@@ -124,7 +116,6 @@ void testThatTimeStampIsDecodedInUartFrame() {
   unsigned char sequence[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 2, 1};
   uint32_t expected = 0x010203;
   uart1SetSequence(sequence, sizeof(sequence));
-  uart1bytesAvailable_ExpectAndReturn(FRAME_LENGTH);
 
   // Test
   getUartFrameRaw(&frame);
@@ -140,7 +131,6 @@ void testThatWidthIsDecodedInUartFrame() {
   unsigned char sequence[] = {0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   uint32_t expected = 0x0201;
   uart1SetSequence(sequence, sizeof(sequence));
-  uart1bytesAvailable_ExpectAndReturn(FRAME_LENGTH);
 
   // Test
   getUartFrameRaw(&frame);
@@ -158,7 +148,6 @@ void testThatOffsetIsDecodedInUartFrame() {
   // The offset is converted from a 6 MHz to 24 MHz clock when read
   uint32_t expected = 0x10203 * 4;
   uart1SetSequence(sequence, sizeof(sequence));
-  uart1bytesAvailable_ExpectAndReturn(FRAME_LENGTH);
 
   // Test
   bool frameOk = getUartFrameRaw(&frame);
@@ -168,7 +157,7 @@ void testThatOffsetIsDecodedInUartFrame() {
   TEST_ASSERT_EQUAL_UINT32(expected, actual);
 
   // Verify the padding data was not affected
-  TEST_ASSERT_TRUE(frameOk);
+  TEST_ASSERT_TRUE(frameOk)
 }
 
 
@@ -177,7 +166,6 @@ void testThatBeamDataIsDecodedInUartFrame() {
   unsigned char sequence[] = {0, 0, 0, 0, 0, 0, 3, 2, 1, 0, 0, 0};
   uint32_t expected = 0x10203;
   uart1SetSequence(sequence, sizeof(sequence));
-  uart1bytesAvailable_ExpectAndReturn(FRAME_LENGTH);
 
   // Test
   bool frameOk = getUartFrameRaw(&frame);
@@ -187,7 +175,7 @@ void testThatBeamDataIsDecodedInUartFrame() {
   TEST_ASSERT_EQUAL_UINT32(expected, actual);
 
   // Verify the padding data was not affected
-  TEST_ASSERT_TRUE(frameOk);
+  TEST_ASSERT_TRUE(frameOk)
 }
 
 void testThatSensorIsDecodedInUartFrame() {
@@ -195,7 +183,6 @@ void testThatSensorIsDecodedInUartFrame() {
   unsigned char sequence[] = {3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   uint8_t expected = 0x3;
   uart1SetSequence(sequence, sizeof(sequence));
-  uart1bytesAvailable_ExpectAndReturn(FRAME_LENGTH);
 
   // Test
   getUartFrameRaw(&frame);
@@ -212,7 +199,6 @@ void testThatLackOfChannelIsDecodedInUartFrame() {
   // Fixture
   unsigned char sequence[] = {0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   uart1SetSequence(sequence, sizeof(sequence));
-  uart1bytesAvailable_ExpectAndReturn(FRAME_LENGTH);
 
   // Test
   getUartFrameRaw(&frame);
@@ -222,7 +208,7 @@ void testThatLackOfChannelIsDecodedInUartFrame() {
 
   // Verify we did not get data in other fields
   TEST_ASSERT_EQUAL_UINT8(0, frame.data.channel);
-  TEST_ASSERT_FALSE(frame.data.slowBit);
+  TEST_ASSERT_FALSE(frame.data.slowbit);
 }
 
 
@@ -231,7 +217,6 @@ void testThatChannelIsDecodedInUartFrame() {
   unsigned char sequence[] = {0x78, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   uint8_t expected = 0x0f;
   uart1SetSequence(sequence, sizeof(sequence));
-  uart1bytesAvailable_ExpectAndReturn(FRAME_LENGTH);
 
   // Test
   getUartFrameRaw(&frame);
@@ -241,7 +226,7 @@ void testThatChannelIsDecodedInUartFrame() {
 
   // Verify we did not get data in other fields
   TEST_ASSERT_TRUE(frame.data.channelFound);
-  TEST_ASSERT_FALSE(frame.data.slowBit);
+  TEST_ASSERT_FALSE(frame.data.slowbit);
 }
 
 
@@ -250,13 +235,12 @@ void testThatSlowBitIsDecodedInUartFrame() {
   unsigned char sequence[] = {0x04, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   uint8_t expected = 0x0f;
   uart1SetSequence(sequence, sizeof(sequence));
-  uart1bytesAvailable_ExpectAndReturn(FRAME_LENGTH);
 
   // Test
   getUartFrameRaw(&frame);
 
   // Assert
-  TEST_ASSERT_TRUE(frame.data.slowBit);
+  TEST_ASSERT_TRUE(frame.data.slowbit);
 
   // Verify we did not get data in other fields
   TEST_ASSERT_TRUE(frame.data.channelFound);
@@ -273,7 +257,7 @@ static void uart1ReadCallback(char* ch, int cmock_num_calls) {
     uart1BytesRead++;
 }
 
-static bool uart1GetcharCallback(char* ch, int cmock_num_calls) {
+static bool uart1GetDataWithTimeoutCallback(char* ch, const uint32_t timeoutTicks, int cmock_num_calls) {
     uart1ReadCallback(ch, cmock_num_calls);
     return true;
 }
@@ -284,5 +268,5 @@ static void uart1SetSequence(char* sequence, int length) {
     uart1SequenceLength = length;
 
     uart1Getchar_StubWithCallback(uart1ReadCallback);
-    uart1Getchar_StubWithCallback(uart1GetcharCallback);
+    uart1GetDataWithTimeout_StubWithCallback(uart1GetDataWithTimeoutCallback);
 }

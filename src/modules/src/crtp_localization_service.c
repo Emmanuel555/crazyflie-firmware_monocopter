@@ -38,11 +38,7 @@
 #include "stabilizer.h"
 #include "configblock.h"
 #include "worker.h"
-#include "autoconf.h"
-
-#ifdef CONFIG_DECK_LIGHTHOUSE
 #include "lighthouse_storage.h"
-#endif
 
 #include "locodeck.h"
 
@@ -53,12 +49,12 @@
 
 #include "num.h"
 
-
 #define NBR_OF_RANGES_IN_PACKET   5
 #define NBR_OF_SWEEPS_IN_PACKET   2
 #define NBR_OF_SENSOR_DIFFS_IN_PACKET   3
 #define NBR_OF_BASESTATIONS   2
 #define NBR_OF_
+#define DEFAULT_EMERGENCY_STOP_TIMEOUT (1 * RATE_MAIN_LOOP)
 
 typedef enum
 {
@@ -79,7 +75,7 @@ typedef struct
 
 typedef struct {
   uint8_t type;
-  uint8_t baseStation;
+  uint8_t basestation;
   struct {
   float sweep;
     struct {
@@ -114,9 +110,7 @@ static CRTPPacket pkRange;
 static uint8_t rangeIndex;
 static bool enableRangeStreamFloat = false;
 
-#ifdef CONFIG_DECK_LIGHTHOUSE
 static CRTPPacket LhAngle;
-#endif
 static bool enableLighthouseAngleStream = false;
 static float extPosStdDev = 0.01;
 static float extQuatStdDev = 4.5e-3;
@@ -128,9 +122,6 @@ static void locSrvCrtpCB(CRTPPacket* pk);
 static void extPositionHandler(CRTPPacket* pk);
 static void genericLocHandle(CRTPPacket* pk);
 static void extPositionPackedHandler(CRTPPacket* pk);
-
-static bool isEmergencyStopRequested = false;
-static uint32_t emergencyStopWatchdogNotificationTick = 0;
 
 void locSrvInit()
 {
@@ -252,12 +243,11 @@ typedef union {
 } __attribute__((packed)) LhPersistArgs_t;
 
 static void lhPersistDataWorker(void* arg) {
-#ifdef CONFIG_DECK_LIGHTHOUSE
   LhPersistArgs_t* args = (LhPersistArgs_t*) &arg;
 
   bool result = true;
 
-  for (int baseStation = 0; baseStation < CONFIG_DECK_LIGHTHOUSE_MAX_N_BS; baseStation++) {
+  for (int baseStation = 0; baseStation < PULSE_PROCESSOR_N_BASE_STATIONS; baseStation++) {
     uint16_t mask = 1 << baseStation;
     bool storeGeo = (args->geoDataBsField & mask) != 0;
     bool storeCalibration = (args->calibrationDataBsField & mask) != 0;
@@ -266,9 +256,7 @@ static void lhPersistDataWorker(void* arg) {
       break;
     }
   }
-#else
-  bool result = false;
-#endif
+
   CRTPPacket response = {
     .port = CRTP_PORT_LOCALIZATION,
     .channel = GENERIC_TYPE,
@@ -296,10 +284,10 @@ static void genericLocHandle(CRTPPacket* pk)
       lpsShortLppPacketHandler(pk);
       break;
     case EMERGENCY_STOP:
-      isEmergencyStopRequested = true;
+      stabilizerSetEmergencyStop();
       break;
     case EMERGENCY_STOP_WATCHDOG:
-      emergencyStopWatchdogNotificationTick = xTaskGetTickCount();
+      stabilizerSetEmergencyStopTimeout(DEFAULT_EMERGENCY_STOP_TIMEOUT);
       break;
     case EXT_POSE:
       extPoseHandler(pk);
@@ -362,21 +350,19 @@ void locSrvSendRangeFloat(uint8_t id, float range)
   }
 }
 
-#ifdef CONFIG_DECK_LIGHTHOUSE
-void locSrvSendLighthouseAngle(int baseStation, pulseProcessorResult_t* angles)
+void locSrvSendLighthouseAngle(int basestation, pulseProcessorResult_t* angles)
 {
   anglePacket *ap = (anglePacket *)LhAngle.data;
 
   if (enableLighthouseAngleStream) {
-    ap->baseStation = baseStation;
-    pulseProcessorBaseStationMeasurement_t* baseStationMeasurement = &angles->baseStationMeasurementsLh1[baseStation];
+    ap->basestation = basestation;
 
     for(uint8_t its = 0; its < NBR_OF_SWEEPS_IN_PACKET; its++) {
-      float angle_first_sensor =  baseStationMeasurement->sensorMeasurements[0].correctedAngles[its];
+      float angle_first_sensor =  angles->sensorMeasurementsLh1[0].baseStatonMeasurements[basestation].correctedAngles[its];
       ap->sweeps[its].sweep = angle_first_sensor;
 
       for(uint8_t itd = 0; itd < NBR_OF_SENSOR_DIFFS_IN_PACKET; itd++) {
-        float angle_other_sensor = baseStationMeasurement->sensorMeasurements[itd + 1].correctedAngles[its];
+        float angle_other_sensor = angles->sensorMeasurementsLh1[itd + 1].baseStatonMeasurements[basestation].correctedAngles[its];
         uint16_t angle_diff = single2half(angle_first_sensor - angle_other_sensor);
         ap->sweeps[its].angleDiffs[itd].angleDiff = angle_diff;
       }
@@ -390,21 +376,8 @@ void locSrvSendLighthouseAngle(int baseStation, pulseProcessorResult_t* angles)
     crtpSendPacket(&LhAngle);
   }
 }
-#endif
 
-bool locSrvIsEmergencyStopRequested() {
-  return isEmergencyStopRequested;
-}
-
-void locSrvResetEmergencyStopRequest() {
-  isEmergencyStopRequested = false;
-}
-
-uint32_t locSrvGetEmergencyStopWatchdogNotificationTick() {
-  return emergencyStopWatchdogNotificationTick;
-}
-
-// This logging group is deprecated (removed after August 2023)
+// This logging group is deprecated
 LOG_GROUP_START(ext_pos)
   LOG_ADD(LOG_FLOAT, X, &ext_pos.x)
   LOG_ADD(LOG_FLOAT, Y, &ext_pos.y)

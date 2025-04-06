@@ -131,13 +131,12 @@ void appMain() {
   // App-channel
   {
     char buffer[APPCHANNEL_MTU];
-    appchannelSendPacket("hello", 5); // Deprecated (removed after August 2023)
+    appchannelSendPacket("hello", 5); // Deprecated
     appchannelSendDataPacketBlock("hello", 5);
     appchannelSendDataPacket("hello", 5);
-    appchannelReceivePacket(buffer, APPCHANNEL_MTU, APPCHANNEL_WAIT_FOREVER); // Deprecated (removed after August 2023)
+    appchannelReceivePacket(buffer, APPCHANNEL_MTU, APPCHANNEL_WAIT_FOREVER); // Deprecated
     appchannelReceiveDataPacket(buffer, APPCHANNEL_MTU, APPCHANNEL_WAIT_FOREVER);
-    appchannelHasOverflowOccured(); // Deprecated (removed after August 2023)
-    appchannelHasOverflowOccurred();
+    appchannelHasOverflowOccured();
   }
 
   // System

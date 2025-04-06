@@ -4,9 +4,7 @@ import cffirmware
 
 def test_controller_mellinger():
 
-    ctrl = cffirmware.controllerMellinger_t()
-
-    cffirmware.controllerMellingerInit(ctrl)
+    cffirmware.controllerMellingerInit()
 
     control = cffirmware.control_t()
     setpoint = cffirmware.setpoint_t()
@@ -35,10 +33,9 @@ def test_controller_mellinger():
     sensors.gyro.y = 0
     sensors.gyro.z = 0
 
-    step = 100
+    tick = 100
 
-    cffirmware.controllerMellinger(ctrl, control, setpoint,sensors,state,step)
-    assert control.controlMode == cffirmware.controlModeLegacy
+    cffirmware.controllerMellinger(control, setpoint,sensors,state,tick)
     # control.thrust will be at a (tuned) hover-state
     assert control.roll == 0
     assert control.pitch == 0

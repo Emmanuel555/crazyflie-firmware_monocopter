@@ -62,24 +62,24 @@
 #define CS_PIN DECK_GPIO_IO1
 
 // LOCO deck alternative IRQ and RESET pins(IO_2, IO_3) instead of default (RX1, TX1), leaving UART1 free for use
-#ifdef CONFIG_DECK_LOCODECK_USE_ALT_PINS
-  #define GPIO_PIN_IRQ    DECK_GPIO_IO2
+#ifdef LOCODECK_USE_ALT_PINS
+  #define GPIO_PIN_IRQ 	  DECK_GPIO_IO2
 
-  #ifndef CONFIG_LOCODECK_ALT_PIN_RESET
-  #define GPIO_PIN_RESET  DECK_GPIO_IO3
+  #ifndef LOCODECK_ALT_PIN_RESET
+  #define GPIO_PIN_RESET 	DECK_GPIO_IO3
   #else
-  #define GPIO_PIN_RESET  DECK_GPIO_IO4
+  #define GPIO_PIN_RESET 	LOCODECK_ALT_PIN_RESET
   #endif
 
   #define EXTI_PortSource EXTI_PortSourceGPIOB
-  #define EXTI_PinSource  EXTI_PinSource5
-  #define EXTI_LineN      EXTI_Line5
+  #define EXTI_PinSource 	EXTI_PinSource5
+  #define EXTI_LineN 		  EXTI_Line5
 #else
-  #define GPIO_PIN_IRQ    DECK_GPIO_RX1
-  #define GPIO_PIN_RESET  DECK_GPIO_TX1
+  #define GPIO_PIN_IRQ 	  DECK_GPIO_RX1
+  #define GPIO_PIN_RESET 	DECK_GPIO_TX1
   #define EXTI_PortSource EXTI_PortSourceGPIOC
-  #define EXTI_PinSource  EXTI_PinSource11
-  #define EXTI_LineN      EXTI_Line11
+  #define EXTI_PinSource 	EXTI_PinSource11
+  #define EXTI_LineN 		  EXTI_Line11
 #endif
 
 
@@ -174,10 +174,6 @@ static void rxCallback(dwDevice_t *dev)
 
 static void rxTimeoutCallback(dwDevice_t * dev) {
   timeout = algorithm->onEvent(dev, eventReceiveTimeout);
-}
-
-static void rxFailedCallback(dwDevice_t * dev) {
-  timeout = algorithm->onEvent(dev, eventReceiveFailed);
 }
 
 static bool handleMemRead(const uint32_t memAddr, const uint8_t readLen, uint8_t* dest) {
@@ -429,7 +425,7 @@ static void spiRead(dwDevice_t* dev, const void *header, size_t headerLength,
   STATS_CNT_RATE_EVENT(&spiReadCount);
 }
 
-#if CONFIG_DECK_LOCODECK_USE_ALT_PINS
+#if LOCODECK_USE_ALT_PINS
   void __attribute__((used)) EXTI5_Callback(void)
 #else
   void __attribute__((used)) EXTI11_Callback(void)
@@ -515,7 +511,6 @@ static void dwm1000Init(DeckInfo *info)
   dwAttachSentHandler(dwm, txCallback);
   dwAttachReceivedHandler(dwm, rxCallback);
   dwAttachReceiveTimeoutHandler(dwm, rxTimeoutCallback);
-  dwAttachReceiveFailedHandler(dwm, rxFailedCallback);
 
   dwNewConfiguration(dwm);
   dwSetDefaults(dwm);
@@ -545,7 +540,7 @@ static void dwm1000Init(DeckInfo *info)
 
   algoSemaphore= xSemaphoreCreateMutex();
 
-  xTaskCreate(uwbTask, LPS_DECK_TASK_NAME, LPS_DECK_STACKSIZE, NULL,
+  xTaskCreate(uwbTask, LPS_DECK_TASK_NAME, 3 * configMINIMAL_STACK_SIZE, NULL,
                     LPS_DECK_TASK_PRI, &uwbTaskHandle);
 
   isInit = true;
@@ -572,20 +567,16 @@ static bool dwm1000Test()
 static const DeckDriver dwm1000_deck = {
   .vid = 0xBC,
   .pid = 0x06,
-  .name = "bcLoco",
+  .name = "bcDWM1000",
 
-#ifdef CONFIG_DECK_LOCODECK_USE_ALT_PINS
-  #ifndef CONFIG_LOCODECK_ALT_PIN_RESET
+#ifdef LOCODEC_USE_ALT_PINS
   .usedGpio = DECK_USING_IO_1 | DECK_USING_IO_2 | DECK_USING_IO_3,
-  #else
-  .usedGpio = DECK_USING_IO_1 | DECK_USING_IO_2 | DECK_USING_IO_4,
-  #endif
 #else
    // (PC10/PC11 is UART1 TX/RX)
   .usedGpio = DECK_USING_IO_1 | DECK_USING_PC10 | DECK_USING_PC11,
 #endif
   .usedPeriph = DECK_USING_SPI,
-  .requiredEstimator = StateEstimatorTypeKalman,
+  .requiredEstimator = kalmanEstimator,
   #ifdef LOCODECK_NO_LOW_INTERFERENCE
   .requiredLowInterferenceRadioMode = false,
   #else
@@ -601,16 +592,9 @@ DECK_DRIVER(dwm1000_deck);
 PARAM_GROUP_START(deck)
 
 /**
- * @brief Deprecated (removed after August 2023). Use the "deck.bcLoco" parameter instead.
- *
- * Nonzero if [Loco positioning deck](%https://store.bitcraze.io/products/loco-positioning-deck) is attached
- */
-PARAM_ADD_CORE(PARAM_UINT8 | PARAM_RONLY, bcDWM1000, &isInit)
-
-/**
  * @brief Nonzero if [Loco positioning deck](%https://store.bitcraze.io/products/loco-positioning-deck) is attached
  */
-PARAM_ADD_CORE(PARAM_UINT8 | PARAM_RONLY, bcLoco, &isInit)
+PARAM_ADD_CORE(PARAM_UINT8 | PARAM_RONLY, bcDWM1000, &isInit)
 
 PARAM_GROUP_STOP(deck)
 
@@ -624,7 +608,7 @@ LOG_GROUP_STOP(ranging)
 LOG_GROUP_START(loco)
 
 /**
- * @brief The current mode of the Loco Positioning system
+ * @brief The current mode of the Loco Positionning system
  *
  * | Value | Mode   | \n
  * | -     | -      | \n

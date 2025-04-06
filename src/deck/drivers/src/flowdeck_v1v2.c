@@ -5,6 +5,8 @@
  * +------+    / /_/ / / /_/ /__/ /  / /_/ / / /_/  __/
  *  ||  ||    /_____/_/\__/\___/_/   \__,_/ /___/\___/
  *
+ * LPS node firmware.
+ *
  * Copyright 2021, Bitcraze AB
  *
  * This program is free software: you can redistribute it and/or modify
@@ -20,7 +22,7 @@
  * You should have received a copy of the GNU General Public License
  * along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
  */
-/* flowdeck_v1v2.c: Flow deck driver */
+/* flowdeck.c: Flow deck driver */
 #include "FreeRTOS.h"
 #include "task.h"
 
@@ -118,13 +120,7 @@ static void flowdeckTask(void *param)
     flowMeasurement_t flowData;
     flowData.stdDevX = stdFlow;
     flowData.stdDevY = stdFlow;
-    flowData.dt = (float)(usecTimestamp()-lastTime)/1000000.0f;
-    // we do want to update dt every measurement and not only in the ones with detected motion,
-    // as we work with instantaneous gyro and velocity values in the update function
-    // (meaning assuming the current measurements over all of dt)
-    lastTime = usecTimestamp();
-
-
+    flowData.dt = 0.01;
 
 #if defined(USE_MA_SMOOTHING)
       // Use MA Smoothing
@@ -155,6 +151,8 @@ static void flowdeckTask(void *param)
       // Push measurements into the estimator if flow is not disabled
       //    and the PMW flow sensor indicates motion detection
       if (!useFlowDisabled && currentMotion.motion == 0xB0) {
+        flowData.dt = (float)(usecTimestamp()-lastTime)/1000000.0f;
+        lastTime = usecTimestamp();
         estimatorEnqueueFlow(&flowData);
       }
     } else {
@@ -201,7 +199,7 @@ static const DeckDriver flowdeck1_deck = {
   .name = "bcFlow",
   .usedGpio = DECK_USING_IO_3,
   .usedPeriph = DECK_USING_I2C | DECK_USING_SPI,
-  .requiredEstimator = StateEstimatorTypeKalman,
+  .requiredEstimator = kalmanEstimator,
 
   .init = flowdeck1Init,
   .test = flowdeck1Test,
@@ -248,7 +246,7 @@ static const DeckDriver flowdeck2_deck = {
 
   .usedGpio = DECK_USING_IO_3,
   .usedPeriph = DECK_USING_I2C | DECK_USING_SPI,
-  .requiredEstimator = StateEstimatorTypeKalman,
+  .requiredEstimator = kalmanEstimator,
 
   .init = flowdeck2Init,
   .test = flowdeck2Test,
@@ -261,11 +259,11 @@ DECK_DRIVER(flowdeck2_deck);
  */
 LOG_GROUP_START(motion)
 /**
- * @brief True if motion occurred since the last measurement
+ * @brief True if motion occured since the last measurement
  */
 LOG_ADD(LOG_UINT8, motion, &currentMotion.motion)
 /**
- * @brief Flow X  measurement  [flow/fr]
+ * @brief Flow X  measurment  [flow/fr]
  */
 LOG_ADD(LOG_INT16, deltaX, &currentMotion.deltaX)
 /**
@@ -285,11 +283,11 @@ LOG_ADD(LOG_UINT8, maxRaw, &currentMotion.maxRawData)
  */
 LOG_ADD(LOG_UINT8, minRaw, &currentMotion.minRawData)
 /**
- * @brief Average raw data value
+ * @brief Avarage raw data value
  */
 LOG_ADD(LOG_UINT8, Rawsum, &currentMotion.rawDataSum)
 /**
- * @brief Counted flow outliers excluded from the estimator
+ * @brief Counted flow outliers exluded from the estimator
  */
 LOG_ADD(LOG_UINT8, outlierCount, &outlierCount)
 /**
@@ -304,7 +302,7 @@ LOG_GROUP_STOP(motion)
 
 /**
  * Settings and parameters for handling of the flowdecks
- * measurements
+ * measurments
  */
 PARAM_GROUP_START(motion)
 /**
@@ -312,11 +310,11 @@ PARAM_GROUP_START(motion)
  */
 PARAM_ADD(PARAM_UINT8, disable, &useFlowDisabled)
 /**
- * @brief Nonzero to turn on adaptive standard deviation estimation (default: 0)
+ * @brief Nonzero to turn on adaptive standard devivation estimation (default: 0)
  */
 PARAM_ADD(PARAM_UINT8, adaptive, &useAdaptiveStd)
 /**
- * @brief Set standard deviation flow measurement (default: 2.0f)
+ * @brief Set standard devivation flow measurement (default: 2.0f)
  */
 PARAM_ADD_CORE(PARAM_FLOAT, flowStdFixed, &flowStdFixed)
 PARAM_GROUP_STOP(motion)

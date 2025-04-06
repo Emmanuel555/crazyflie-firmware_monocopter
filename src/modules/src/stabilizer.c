@@ -7,7 +7,7 @@
  *
  * Crazyflie Firmware
  *
- * Copyright (C) 2011-2022 Bitcraze AB
+ * Copyright (C) 2011-2016 Bitcraze AB
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -57,7 +57,14 @@
 #include "static_mem.h"
 #include "rateSupervisor.h"
 
+// sd log 
+#include "eventtrigger.h"
+
+EVENTTRIGGER(myEvent, uint8, var1)
+
 static bool isInit;
+static bool emergencyStop = false;
+static int emergencyStopTimeout = EMERGENCY_STOP_TIMEOUT_DISABLED;
 
 static uint32_t inToOutLatency;
 
@@ -66,11 +73,7 @@ static setpoint_t setpoint;
 static sensorData_t sensorData;
 static state_t state;
 static control_t control;
-
-static motors_thrust_uncapped_t motorThrustUncapped;
-static motors_thrust_uncapped_t motorThrustBatCompUncapped;
-static motors_thrust_pwm_t motorPwm;
-
+static motors_thrust_t motorPower;
 // For scratch storage - never logged or passed to other subsystems.
 static setpoint_t tempSetpoint;
 
@@ -80,7 +83,7 @@ static ControllerType controllerType;
 static STATS_CNT_RATE_DEFINE(stabilizerRate, 500);
 static rateSupervisor_t rateSupervisorContext;
 static bool rateWarningDisplayed = false;
-SemaphoreHandle_t xRateSupervisorSemaphore;
+double I_yaw =  0;
 
 static struct {
   // position - mm
@@ -119,10 +122,8 @@ static struct {
 } setpointCompressed;
 
 STATIC_MEM_TASK_ALLOC(stabilizerTask, STABILIZER_TASK_STACKSIZE);
-STATIC_MEM_TASK_ALLOC(rateSupervisorTask, RATE_SUPERVISOR_TASK_STACKSIZE);
 
 static void stabilizerTask(void* param);
-static void rateSupervisorTask(void* param);
 
 static void calcSensorToOutputLatency(const sensorData_t *sensorData)
 {
@@ -179,12 +180,12 @@ void stabilizerInit(StateEstimatorType estimator)
 
   sensorsInit();
   stateEstimatorInit(estimator);
-  controllerInit(ControllerTypeAutoSelect);
+  controllerInit(ControllerTypeAny);
   powerDistributionInit();
   motorsInit(platformConfigGetMotorMapping());
   collisionAvoidanceInit();
-  estimatorType = stateEstimatorGetType();
-  controllerType = controllerGetType();
+  estimatorType = getStateEstimator();
+  controllerType = getControllerType();
 
   STATIC_MEM_TASK_CREATE(stabilizerTask, stabilizerTask, STABILIZER_TASK_NAME, NULL, STABILIZER_TASK_PRI);
 
@@ -205,87 +206,25 @@ bool stabilizerTest(void)
   return pass;
 }
 
-static void batteryCompensation(const motors_thrust_uncapped_t* motorThrustUncapped, motors_thrust_uncapped_t* motorThrustBatCompUncapped)
+static void checkEmergencyStopTimeout()
 {
-  float supplyVoltage = pmGetBatteryVoltage();
+  if (emergencyStopTimeout >= 0) {
+    emergencyStopTimeout -= 1;
 
-  for (int motor = 0; motor < STABILIZER_NR_OF_MOTORS; motor++)
-  {
-    motorThrustBatCompUncapped->list[motor] = motorsCompensateBatteryVoltage(motor, motorThrustUncapped->list[motor], supplyVoltage);
-  }
-}
-
-static void setMotorRatios(const motors_thrust_pwm_t* motorPwm)
-{
-  motorsSetRatio(MOTOR_M1, motorPwm->motors.m1);
-  motorsSetRatio(MOTOR_M2, motorPwm->motors.m2);
-  motorsSetRatio(MOTOR_M3, motorPwm->motors.m3);
-  motorsSetRatio(MOTOR_M4, motorPwm->motors.m4);
-}
-
-static void updateStateEstimatorAndControllerTypes() {
-  if (stateEstimatorGetType() != estimatorType) {
-    stateEstimatorSwitchTo(estimatorType);
-    estimatorType = stateEstimatorGetType();
-  }
-
-  if (controllerGetType() != controllerType) {
-    controllerInit(controllerType);
-    controllerType = controllerGetType();
-  }
-}
-
-static void logCapWarning(const bool isCapped) {
-  #ifdef CONFIG_LOG_MOTOR_CAP_WARNING
-  static uint32_t nextReportTick = 0;
-
-  if (isCapped) {
-    uint32_t now = xTaskGetTickCount();
-    if (now > nextReportTick) {
-      DEBUG_PRINT("Warning: motor thrust saturated\n");
-      nextReportTick = now + M2T(3000);
+    if (emergencyStopTimeout == 0) {
+      emergencyStop = true;
     }
   }
-  #endif
-}
+}          
 
-static void controlMotors(const control_t* control) {
-  powerDistribution(control, &motorThrustUncapped);
-  batteryCompensation(&motorThrustUncapped, &motorThrustBatCompUncapped);
-  const bool isCapped = powerDistributionCap(&motorThrustBatCompUncapped, &motorPwm);
-  logCapWarning(isCapped);
-  setMotorRatios(&motorPwm);
-}
-
-void rateSupervisorTask(void *pvParameters) {
-  while (1) {
-    // Wait for the semaphore to be given by the stabilizerTask
-    if (xSemaphoreTake(xRateSupervisorSemaphore, M2T(2000)) == pdTRUE) {
-      // Validate the rate
-      if (!rateSupervisorValidate(&rateSupervisorContext, xTaskGetTickCount())) {
-        if (!rateWarningDisplayed) {
-          DEBUG_PRINT("WARNING: stabilizer loop rate is off (%lu)\n", rateSupervisorLatestCount(&rateSupervisorContext));
-          rateWarningDisplayed = true;
-        }
-      }
-    } else {
-      // Don't assert if sensors are suspended
-      if (isSensorsSuspended() == false) {
-        // Handle the case where the semaphore was not given within the timeout
-        DEBUG_PRINT("ERROR: stabilizerTask is blocking\n");
-        ASSERT(false); // For safety, assert if the stabilizer task is blocking to ensure motor shutdown
-      }
-    }
-  }
-}
-
-/* The stabilizer loop runs at 1kHz. It is the
+/* The stabilizer loop runs at 1kHz (stock) or 500Hz (kalman). It is the
  * responsibility of the different functions to run slower by skipping call
  * (ie. returning without modifying the output structure).
  */
+
 static void stabilizerTask(void* param)
 {
-  stabilizerStep_t stabilizerStep;
+  uint32_t tick;
   uint32_t lastWakeTime;
   vTaskSetApplicationTaskTag(0, (void*)TASK_STABILIZER_ID_NBR);
 
@@ -299,100 +238,138 @@ static void stabilizerTask(void* param)
   while(!sensorsAreCalibrated()) {
     vTaskDelayUntil(&lastWakeTime, F2T(RATE_MAIN_LOOP));
   }
-  // Initialize stabilizerStep to something else than 0
-  stabilizerStep = 1;
+  // Initialize tick to something else then 0
+  tick = 1;
 
-  systemWaitStart();
-  DEBUG_PRINT("Starting stabilizer loop\n");
   rateSupervisorInit(&rateSupervisorContext, xTaskGetTickCount(), M2T(1000), 997, 1003, 1);
-  xRateSupervisorSemaphore = xSemaphoreCreateBinary();
-  STATIC_MEM_TASK_CREATE(rateSupervisorTask, rateSupervisorTask, RATE_SUPERVISOR_TASK_NAME, NULL, RATE_SUPERVISOR_TASK_PRI);
+
+  DEBUG_PRINT("Ready to fly.\n");
 
   while(1) {
     // The sensor should unlock at 1kHz
     sensorsWaitDataReady();
 
     // update sensorData struct (for logging variables)
-    sensorsAcquire(&sensorData);
+    sensorsAcquire(&sensorData, tick);
 
-    if (healthShallWeRunTest()) {
+    // if (healthShallWeRunTest()) {
+    if (false) {
       healthRunTests(&sensorData);
     } else {
-      updateStateEstimatorAndControllerTypes();
+      // allow to update estimator dynamically
+      if (getStateEstimator() != estimatorType) {
+        stateEstimatorSwitchTo(estimatorType);
+        estimatorType = getStateEstimator();
+      }
+      // allow to update controller dynamically
+      if (getControllerType() != controllerType) {
+        controllerInit(controllerType);
+        controllerType = getControllerType();
+      }
 
-      stateEstimator(&state, stabilizerStep);
+      stateEstimator(&state, tick);
+      compressState();
 
-      const bool areMotorsAllowedToRun = supervisorAreMotorsAllowedToRun();
-
-      // Critical for safety, be careful if you modify this code!
-      crtpCommanderBlock(! areMotorsAllowedToRun);
-
-      if (crtpCommanderHighLevelGetSetpoint(&tempSetpoint, &state, stabilizerStep)) {
+      if (crtpCommanderHighLevelGetSetpoint(&tempSetpoint, &state, tick)) {
         commanderSetSetpoint(&tempSetpoint, COMMANDER_PRIORITY_HIGHLEVEL);
       }
+
       commanderGetSetpoint(&setpoint, &state);
+      compressSetpoint();
 
-      // Critical for safety, be careful if you modify this code!
-      // Let the supervisor update it's view of the current situation
-      supervisorUpdate(&sensorData, &setpoint, stabilizerStep);
+      collisionAvoidanceUpdateSetpoint(&setpoint, &sensorData, &state, tick);
 
-      // Let the collision avoidance module modify the setpoint, if needed
-      collisionAvoidanceUpdateSetpoint(&setpoint, &sensorData, &state, stabilizerStep);
+      controller(&control, &setpoint, &sensorData, &state, tick);
+        
+      control.thrust = setpoint.position.x;  
+      control.thrust_2 = setpoint.position.y; 
+      control.thrust_3 = setpoint.position.z; 
+      control.thrust_4 = setpoint.attitude.yaw; 
+      
 
-      // Critical for safety, be careful if you modify this code!
-      // Let the supervisor modify the setpoint to handle exceptional conditions
-      supervisorOverrideSetpoint(&setpoint);
+      checkEmergencyStopTimeout();
 
-      controller(&control, &setpoint, &sensorData, &state, stabilizerStep);
+      //
+      // The supervisor module keeps track of Crazyflie state such as if
+      // we are ok to fly, or if the Crazyflie is in flight.
+      //
+      supervisorUpdate(&sensorData);
 
-      // Critical for safety, be careful if you modify this code!
-      // The supervisor will already set thrust to 0 in the setpoint if needed, but to be extra sure prevent motors from running.
-      if (areMotorsAllowedToRun) {
-        controlMotors(&control);
+      if (emergencyStop || (systemIsArmed() == false)) {
+        //motorsStop();
+        powerDistribution(&motorPower, &control);
+        motorsSetRatio(MOTOR_M1, motorPower.m1);
+        motorsSetRatio(MOTOR_M2, motorPower.m2);
+        motorsSetRatio(MOTOR_M3, motorPower.m3);
+        motorsSetRatio(MOTOR_M4, motorPower.m4);  //modified
+
       } else {
-        motorsStop();
+        powerDistribution(&motorPower, &control);
+        motorsSetRatio(MOTOR_M1, motorPower.m1);
+        motorsSetRatio(MOTOR_M2, motorPower.m2);
+        motorsSetRatio(MOTOR_M3, motorPower.m3);
+        motorsSetRatio(MOTOR_M4, motorPower.m4);
       }
 
-      // Compute compressed log formats
-      compressState();
-      compressSetpoint();
 
 #ifdef CONFIG_DECK_USD
       // Log data to uSD card if configured
       if (usddeckLoggingEnabled()
           && usddeckLoggingMode() == usddeckLoggingMode_SynchronousStabilizer
-          && RATE_DO_EXECUTE(usddeckFrequency(), stabilizerStep)) {
+          && RATE_DO_EXECUTE(usddeckFrequency(), tick)) {
         usddeckTriggerLogging();
       }
 #endif
       calcSensorToOutputLatency(&sensorData);
-      stabilizerStep++;
+      tick++;
       STATS_CNT_RATE_EVENT(&stabilizerRate);
+
+      if (!rateSupervisorValidate(&rateSupervisorContext, xTaskGetTickCount())) {
+        if (!rateWarningDisplayed) {
+          DEBUG_PRINT("WARNING: stabilizer loop rate is off (%lu)\n", rateSupervisorLatestCount(&rateSupervisorContext));
+          rateWarningDisplayed = true;
+        }
+      }
     }
-
-    xSemaphoreGive(xRateSupervisorSemaphore);
-
 #ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT
     motorsBurstDshot();
 #endif
   }
 }
 
+void stabilizerSetEmergencyStop()
+{
+  emergencyStop = true;
+}
+
+void stabilizerResetEmergencyStop()
+{
+  emergencyStop = false;
+}
+
+void stabilizerSetEmergencyStopTimeout(int timeout)
+{
+  emergencyStop = false;
+  emergencyStopTimeout = timeout;
+}
+
 /**
  * Parameters to set the estimator and controller type
- * for the stabilizer module
+ * for the stabilizer module, or to do an emergency stop
  */
 PARAM_GROUP_START(stabilizer)
 /**
- * @brief Estimator type Auto select(0), complementary(1), extended kalman(2), **unscented kalman(3)  (Default: 0)
- *
- * ** Experimental, needs to be enabled in kbuild
+ * @brief Estimator type Any(0), complementary(1), kalman(2) (Default: 0)
  */
 PARAM_ADD_CORE(PARAM_UINT8, estimator, &estimatorType)
 /**
- * @brief Controller type Auto select(0), PID(1), Mellinger(2), INDI(3), Brescianini(4), Lee(5) (Default: 0)
+ * @brief Controller type Any(0), PID(1), Mellinger(2), INDI(3) (Default: 0)
  */
 PARAM_ADD_CORE(PARAM_UINT8, controller, &controllerType)
+/**
+ * @brief If set to nonzero will turn off power
+ */
+PARAM_ADD_CORE(PARAM_UINT8, stop, &emergencyStop)
 PARAM_GROUP_STOP(stabilizer)
 
 
@@ -836,31 +813,3 @@ LOG_ADD(LOG_INT16, ratePitch, &stateCompressed.ratePitch)
  */
 LOG_ADD(LOG_INT16, rateYaw, &stateCompressed.rateYaw)
 LOG_GROUP_STOP(stateEstimateZ)
-
-
-LOG_GROUP_START(motor)
-
-/**
- * @brief Requested motor power for m1, including battery compensation. Same scale as the motor PWM but uncapped
- * and may have values outside the [0 - UINT16_MAX] range.
- */
-LOG_ADD(LOG_INT32, m1req, &motorThrustBatCompUncapped.motors.m1)
-
-/**
- * @brief Requested motor power for m1, including battery compensation. Same scale as the motor PWM but uncapped
- * and may have values outside the [0 - UINT16_MAX] range.
- */
-LOG_ADD(LOG_INT32, m2req, &motorThrustBatCompUncapped.motors.m2)
-
-/**
- * @brief Requested motor power for m1, including battery compensation. Same scale as the motor PWM but uncapped
- * and may have values outside the [0 - UINT16_MAX] range.
- */
-LOG_ADD(LOG_INT32, m3req, &motorThrustBatCompUncapped.motors.m3)
-
-/**
- * @brief Requested motor power for m1, including battery compensation. Same scale as the motor PWM but uncapped
- * and may have values outside the [0 - UINT16_MAX] range.
- */
-LOG_ADD(LOG_INT32, m4req, &motorThrustBatCompUncapped.motors.m4)
-LOG_GROUP_STOP(motor)

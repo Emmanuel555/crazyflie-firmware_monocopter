@@ -1801,3 +1801,4 @@ static void check_empty_gyro_fifo(uint16_t *data_index, const struct bmi088_dev 
 
 #endif
 /** @}*/
+

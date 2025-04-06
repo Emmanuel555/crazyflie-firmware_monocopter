@@ -40,7 +40,6 @@
 #include "platform.h"
 #include "app_channel.h"
 #include "static_mem.h"
-#include "supervisor.h"
 
 static bool isInit=false;
 STATIC_MEM_TASK_ALLOC_STACK_NO_DMA_CCM_SAFE(platformSrvTask, PLATFORM_SRV_TASK_STACKSIZE);
@@ -52,9 +51,7 @@ typedef enum {
 } Channel;
 
 typedef enum {
-  setContinuousWave  = 0x00,
-  armSystem          = 0x01,
-  recoverSystem     = 0x02, 
+  setContinousWave   = 0x00,
 } PlatformCommand;
 
 typedef enum {
@@ -64,7 +61,7 @@ typedef enum {
 } VersionCommand;
 
 static void platformSrvTask(void*);
-static void platformCommandProcess(CRTPPacket *p);
+static void platformCommandProcess(uint8_t command, uint8_t *data);
 static void versionCommandProcess(CRTPPacket *p);
 
 void platformserviceInit(void)
@@ -97,7 +94,7 @@ static void platformSrvTask(void* prm)
     switch (p.channel)
     {
       case platformCommand:
-        platformCommandProcess(&p);
+        platformCommandProcess(p.data[0], &p.data[1]);
         crtpSendPacketBlock(&p);
         break;
       case versionCommand:
@@ -112,38 +109,17 @@ static void platformSrvTask(void* prm)
   }
 }
 
-static void platformCommandProcess(CRTPPacket *p)
+static void platformCommandProcess(uint8_t command, uint8_t *data)
 {
-  uint8_t command = p->data[0];
-  uint8_t *data = &p->data[1];
+  static SyslinkPacket slp;
 
   switch (command) {
-    case setContinuousWave:
-    {
-      static SyslinkPacket slp;
+    case setContinousWave:
       slp.type = SYSLINK_RADIO_CONTWAVE;
       slp.length = 1;
       slp.data[0] = data[0];
       syslinkSendPacket(&slp);
       break;
-    }
-    case armSystem:
-    {
-      const bool doArm = data[0];
-      const bool success = supervisorRequestArming(doArm);
-      data[0] = success;
-      data[1] = supervisorIsArmed();
-      p->size = 2;
-      break;
-    }
-    case recoverSystem:
-    {
-      const bool success = supervisorRequestCrashRecovery(true);
-      data[0] = success;
-      data[1] = !supervisorIsCrashed();
-      p->size = 2;
-      break;
-    }    
     default:
       break;
   }
@@ -167,7 +143,7 @@ static void versionCommandProcess(CRTPPacket *p)
 {
   switch (p->data[0]) {
     case getProtocolVersion:
-      *(int*)&p->data[1] = CRTP_PROTOCOL_VERSION;
+      *(int*)&p->data[1] = PROTOCOL_VERSION;
       p->size = 5;
       crtpSendPacketBlock(p);
       break;

@@ -67,8 +67,6 @@ static int radiolinkReceiveCRTPPacket(CRTPPacket *p);
 static uint8_t rssi;
 static bool isConnected;
 static uint32_t lastPacketTick;
-static uint16_t count_rx_broadcast;
-static uint16_t count_rx_unicast;
 
 static volatile P2PCallback p2p_callback;
 
@@ -162,9 +160,8 @@ void radiolinkSyslinkDispatch(SyslinkPacket *slp)
   if (slp->type == SYSLINK_RADIO_RAW)
   {
     slp->length--; // Decrease to get CRTP size.
-    // Assert that we are not dropping any packets
+    // Assert that we are not dopping any packets
     ASSERT(xQueueSend(crtpPacketDelivery, &slp->length, 0) == pdPASS);
-    ++count_rx_unicast;
     ledseqRun(&seq_linkUp);
     // If a radio packet is received, one can be sent
     if (xQueueReceive(txQueue, &txPacket, 0) == pdTRUE)
@@ -176,11 +173,7 @@ void radiolinkSyslinkDispatch(SyslinkPacket *slp)
   {
     slp->length--; // Decrease to get CRTP size.
     // broadcasts are best effort, so no need to handle the case where the queue is full
-    BaseType_t result = xQueueSend(crtpPacketDelivery, &slp->length, 0);
-    // only increment the received counter, if we were able to put it in the queue
-    if (result == pdPASS) {
-      ++count_rx_broadcast;
-    }
+    xQueueSend(crtpPacketDelivery, &slp->length, 0);
     ledseqRun(&seq_linkUp);
     // no ack for broadcasts
   } else if (slp->type == SYSLINK_RADIO_RSSI)
@@ -266,28 +259,7 @@ static int radiolinkSetEnable(bool enable)
   return 0;
 }
 
-/**
- * Radio link log variables.
- */
 LOG_GROUP_START(radio)
-/**
- * @brief Radio Signal Strength Indicator [dBm]
- */
 LOG_ADD_CORE(LOG_UINT8, rssi, &rssi)
-/**
- * @brief Indicator if a packet was received from the radio within the last RADIO_ACTIVITY_TIMEOUT_MS.
- */
 LOG_ADD_CORE(LOG_UINT8, isConnected, &isConnected)
-/**
- * @brief Number of broadcast packets received.
- * 
- * Note that this is only 16 bits and overflows. Use overflow correction on the client side.
- */
-LOG_ADD_CORE(LOG_UINT16, numRxBc, &count_rx_broadcast)
-/**
- * @brief Number of unicast packets received.
- * 
- * Note that this is only 16 bits and overflows. Use overflow correction on the client side.
- */
-LOG_ADD_CORE(LOG_UINT16, numRxUc, &count_rx_unicast)
 LOG_GROUP_STOP(radio)

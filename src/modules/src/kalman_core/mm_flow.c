@@ -26,8 +26,6 @@
 #include "mm_flow.h"
 #include "log.h"
 
-#define FLOW_RESOLUTION 0.1f //We do get the measurements in 10x the motion pixels (experimentally measured)
-
 // TODO remove the temporary test variables (used for logging)
 static float predictedNX;
 static float predictedNY;
@@ -40,9 +38,9 @@ void kalmanCoreUpdateWithFlow(kalmanCoreData_t* this, const flowMeasurement_t *f
 
   // ~~~ Camera constants ~~~
   // The angle of aperture is guessed from the raw data register and thankfully look to be symmetric
-  float Npix = 35.0;                      // [pixels] (same in x and y)
+  float Npix = 30.0;                      // [pixels] (same in x and y)
   //float thetapix = DEG_TO_RAD * 4.0f;     // [rad]    (same in x and y)
-  float thetapix = 0.71674f;// 2*sin(42/2); 42degree is the agnle of aperture, here we computed the corresponding ground length
+  float thetapix = DEG_TO_RAD * 4.2f;
   //~~~ Body rates ~~~
   // TODO check if this is feasible or if some filtering has to be done
   float omegax_b = gyro->x * DEG_TO_RAD;
@@ -73,31 +71,32 @@ void kalmanCoreUpdateWithFlow(kalmanCoreData_t* this, const flowMeasurement_t *f
   }
 
   // ~~~ X velocity prediction and update ~~~
-  // predicts the number of accumulated pixels in the x-direction
+  // predics the number of accumulated pixels in the x-direction
+  float omegaFactor = 1.25f;
   float hx[KC_STATE_DIM] = {0};
   arm_matrix_instance_f32 Hx = {1, KC_STATE_DIM, hx};
-  predictedNX = (flow->dt * Npix / thetapix ) * ((dx_g * this->R[2][2] / z_g) - omegay_b);
-  measuredNX = flow->dpixelx*FLOW_RESOLUTION;
+  predictedNX = (flow->dt * Npix / thetapix ) * ((dx_g * this->R[2][2] / z_g) - omegaFactor * omegay_b);
+  measuredNX = flow->dpixelx;
 
   // derive measurement equation with respect to dx (and z?)
   hx[KC_STATE_Z] = (Npix * flow->dt / thetapix) * ((this->R[2][2] * dx_g) / (-z_g * z_g));
   hx[KC_STATE_PX] = (Npix * flow->dt / thetapix) * (this->R[2][2] / z_g);
 
   //First update
-  kalmanCoreScalarUpdate(this, &Hx, (measuredNX-predictedNX), flow->stdDevX*FLOW_RESOLUTION);
+  kalmanCoreScalarUpdate(this, &Hx, measuredNX-predictedNX, flow->stdDevX);
 
   // ~~~ Y velocity prediction and update ~~~
   float hy[KC_STATE_DIM] = {0};
   arm_matrix_instance_f32 Hy = {1, KC_STATE_DIM, hy};
-  predictedNY = (flow->dt * Npix / thetapix ) * ((dy_g * this->R[2][2] / z_g) + omegax_b);
-  measuredNY = flow->dpixely*FLOW_RESOLUTION;
+  predictedNY = (flow->dt * Npix / thetapix ) * ((dy_g * this->R[2][2] / z_g) + omegaFactor * omegax_b);
+  measuredNY = flow->dpixely;
 
   // derive measurement equation with respect to dy (and z?)
   hy[KC_STATE_Z] = (Npix * flow->dt / thetapix) * ((this->R[2][2] * dy_g) / (-z_g * z_g));
   hy[KC_STATE_PY] = (Npix * flow->dt / thetapix) * (this->R[2][2] / z_g);
 
   // Second update
-  kalmanCoreScalarUpdate(this, &Hy, (measuredNY-predictedNY), flow->stdDevY*FLOW_RESOLUTION);
+  kalmanCoreScalarUpdate(this, &Hy, measuredNY-predictedNY, flow->stdDevY);
 }
 
 /**

@@ -36,10 +36,8 @@
 #include "motors.h"
 #include "pm.h"
 #include "debug.h"
-#include "power_distribution.h"
 #include "nvicconf.h"
 #include "usec_time.h"
-#include "platform_defaults.h"
 //FreeRTOS includes
 #include "task.h"
 
@@ -47,9 +45,10 @@
 #include "log.h"
 #include "param.h"
 
-static uint8_t motorSetEnable = 0;
+static bool motorSetEnable = false;
+static uint32_t motorPower[] = {0, 0, 0, 0};    // user-requested PWM signals
 static uint16_t motorPowerSet[] = {0, 0, 0, 0}; // user-requested PWM signals (overrides)
-static uint16_t motor_ratios[] = {0, 0, 0, 0};  // actual PWM signals
+static uint32_t motor_ratios[] = {0, 0, 0, 0};  // actual PWM signals
 
 #ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT
 static DMA_InitTypeDef DMA_InitStructureShare;
@@ -72,33 +71,29 @@ const uint32_t MOTORS[] = { MOTOR_M1, MOTOR_M2, MOTOR_M3, MOTOR_M4 };
 const uint16_t testsound[NBR_OF_MOTORS] = {A4, A5, F5, D5 };
 
 const MotorHealthTestDef brushedMotorHealthTestSettings = {
-   .onPeriodMsec = HEALTH_BRUSHED_ON_PERIOD_MSEC,
-   .offPeriodMsec = HEALTH_BRUSHED_OFF_PERIOD_MSEC,
-   .varianceMeasurementStartMsec = HEALTH_BRUSHED_VARIANCE_START_MSEC,
-   .onPeriodPWMRatioProp = HEALTH_BRUSHED_PROP_ON_PERIOD_PWM_RATIO,
-   .onPeriodPWMRatioBat = HEALTH_BRUSHED_BAT_ON_PERIOD_PWM_RATIO,
+  /* onPeriodMsec = */ 50,
+  /* offPeriodMsec = */ 950,
+  /* varianceMeasurementStartMsec = */ 0,
+  /* onPeriodPWMRatio = */ 0xFFFF,
 };
 
 const MotorHealthTestDef brushlessMotorHealthTestSettings = {
-    .onPeriodMsec = HEALTH_BRUSHLESS_ON_PERIOD_MSEC,
-    .offPeriodMsec = HEALTH_BRUSHLESS_OFF_PERIOD_MSEC,
-    .varianceMeasurementStartMsec = HEALTH_BRUSHLESS_VARIANCE_START_MSEC,
-    .onPeriodPWMRatioProp = 0, /* user must set health.propTestPWMRatio explicitly */
-    .onPeriodPWMRatioBat = 0, /* user must set health.batTestPWMRatio explicitly */
+  /* onPeriodMsec = */ 2000,
+  /* offPeriodMsec = */ 1000,
+  /* varianceMeasurementStartMsec = */ 1000,
+  /* onPeriodPWMRatio = */ 0 /* user must set health.propTestPWMRatio explicitly */
 };
 
 const MotorHealthTestDef unknownMotorHealthTestSettings = {
-    .onPeriodMsec = 0,
-    .offPeriodMsec = 0,
-    .varianceMeasurementStartMsec = 0,
-    .onPeriodPWMRatioProp = 0,
-    .onPeriodPWMRatioBat = 0,
+  /* onPeriodMsec = */ 0,
+  /* offPeriodMseec = */ 0,
+  /* varianceMeasurementStartMsec = */ 0,
+  /* onPeriodPWMRatio = */ 0
 };
 
 static bool isInit = false;
 static uint64_t lastCycleTime;
 static uint32_t cycleTime;
-
 
 /* Private functions */
 
@@ -168,39 +163,32 @@ GPIO_InitTypeDef GPIO_PassthroughOutput =
 //
 // => p = -0.00062390   0.08835522   0.06865956
 //
-// We will not use the constant term, since we want zero thrust to equal
+// We will not use the contant term, since we want zero thrust to equal
 // zero PWM.
 //
 // And to get the PWM as a percentage we would need to divide the
 // Voltage needed with the Supply voltage.
-float motorsCompensateBatteryVoltage(uint32_t id, float iThrust, float supplyVoltage)
+static uint16_t motorsCompensateBatteryVoltage(uint16_t ithrust)
 {
-  #ifdef CONFIG_ENABLE_THRUST_BAT_COMPENSATED
-  ASSERT(id < NBR_OF_MOTORS);
-
-  if (motorMap[id]->drvType == BRUSHED)
+  float supply_voltage = pmGetBatteryVoltage();
+  /*
+   * A LiPo battery is supposed to be 4.2V charged, 3.7V mid-charge and 3V
+   * discharged.
+   * 
+   * A suiteble sanity check for disabiling the voltage compensation would be
+   * under 2V. That would suggest a damaged battery. This protects against
+   * rushing the motors on bugs and invalid voltage levels.
+   */
+  if (supply_voltage < 2.0f)
   {
-    /*
-    * A LiPo battery is supposed to be 4.2V charged, 3.7V mid-charge and 3V
-    * discharged.
-    *
-    * A suitable sanity check for disabling the voltage compensation would be
-    * under 2V. That would suggest a damaged battery. This protects against
-    * rushing the motors on bugs and invalid voltage levels.
-    */
-    if (supplyVoltage < 2.0f)
-    {
-      return iThrust;
-    }
-
-    float thrust = (iThrust / 65536.0f) * 60;
-    float volts = -0.0006239f * thrust * thrust + 0.088f * thrust;
-    float ratio = volts / supplyVoltage;
-    return UINT16_MAX * ratio;
+    return ithrust;
   }
-  #endif
 
-  return iThrust;
+  float thrust = ((float) ithrust / 65536.0f) * 60;
+  float volts = -0.0006239f * thrust * thrust + 0.088f * thrust;
+  float percentage = volts / supply_voltage;
+  percentage = percentage > 1.0f ? 1.0f : percentage;
+  return percentage * UINT16_MAX;
 }
 
 /* Public functions */
@@ -223,20 +211,6 @@ void motorsInit(const MotorPerifDef** motorMapSelect)
   motorMap = motorMapSelect;
 
   DEBUG_PRINT("Using %s motor driver\n", motorMap[0]->drvType == BRUSHED ? "brushed" : "brushless");
-
-  if (motorMap[MOTOR_M1]->hasPC15ESCReset)
-  {
-    MOTORS_RCC_GPIO_CMD(RCC_AHB1Periph_GPIOC, ENABLE);
-    // Configure the GPIO for CF-BL ESC RST
-    GPIO_StructInit(&GPIO_InitStructure);
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-    GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15;
-    GPIO_Init(GPIOC, &GPIO_InitStructure);
-    // Hold reset for all CF-BL ESC:s by pulling low.
-    GPIO_WriteBit(GPIOC, GPIO_Pin_15, Bit_RESET);
-  }
 
   for (i = 0; i < NBR_OF_MOTORS; i++)
   {
@@ -287,11 +261,9 @@ void motorsInit(const MotorPerifDef** motorMapSelect)
     motorMap[i]->ocInit(motorMap[i]->tim, &TIM_OCInitStructure);
     motorMap[i]->preloadConfig(motorMap[i]->tim, TIM_OCPreload_Enable);
   }
-
 #ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT
   motorsDshotDMASetup();
 #endif
-
   // Start the timers
   for (i = 0; i < NBR_OF_MOTORS; i++)
   {
@@ -302,12 +274,6 @@ void motorsInit(const MotorPerifDef** motorMapSelect)
 
   // Output zero power
   motorsStop();
-
-  if (motorMap[MOTOR_M1]->hasPC15ESCReset)
-  {
-    // Release reset for all CF-BL ESC:s after motor signal is activated
-    GPIO_WriteBit(GPIOC, GPIO_Pin_15, Bit_SET);
-  }
 }
 
 void motorsDeInit(const MotorPerifDef** motorMapSelect)
@@ -357,16 +323,12 @@ bool motorsTest(void)
 
 void motorsStop()
 {
-  for (int i = 0; i < NBR_OF_MOTORS; i++)
-  {
-    motorsSetRatio(MOTORS[i], powerDistributionStopRatio(i));
-  }
-
+  motorsSetRatio(MOTOR_M1, 0);
+  motorsSetRatio(MOTOR_M2, 0);
+  motorsSetRatio(MOTOR_M3, 0);
+  motorsSetRatio(MOTOR_M4, 0);
 #ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT
-  if (motorMap[0]->drvType == BRUSHLESS)
-  {
-    motorsBurstDshot();
-  }
+  motorsBurstDshot();
 #endif
 }
 
@@ -400,7 +362,7 @@ static void motorsDshotDMASetup()
     DMA_Init(motorMap[i]->DMA_stream, &DMA_InitStructureShare);
 
     NVIC_InitStructure.NVIC_IRQChannel = motorMap[i]->DMA_IRQChannel;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = NVIC_MOTORS_PRI;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = NVIC_MID_PRI;
     NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
@@ -489,21 +451,26 @@ void motorsBurstDshot()
 void motorsSetRatio(uint32_t id, uint16_t ithrust)
 {
   if (isInit) {
-    ASSERT(id < NBR_OF_MOTORS);
-
     uint16_t ratio = ithrust;
 
-    // Override ratio in case of motorSetEnable
-    if (motorSetEnable == 2)
+    ASSERT(id < NBR_OF_MOTORS);
+
+    motorPower[id] = ithrust;
+
+#ifdef ENABLE_THRUST_BAT_COMPENSATED
+    if (motorMap[id]->drvType == BRUSHED)
     {
-      ratio = motorPowerSet[MOTOR_M1];
+      // To make sure we provide the correct PWM given current supply voltage
+      // from the battery, we do calculations based on measurements of PWM,
+      // voltage and thrust. See comment at function definition for details.
+      ratio = motorsCompensateBatteryVoltage(ithrust);
     }
-    else if (motorSetEnable == 1)
-    {
-      ratio = motorPowerSet[id];
-    }
+#endif
 
     motor_ratios[id] = ratio;
+    if (motorSetEnable) {
+      ratio = motorPowerSet[id];
+    }
 
     if (motorMap[id]->drvType == BRUSHLESS)
     {
@@ -593,7 +560,7 @@ int motorsESCIsLo(uint32_t id)
   return GPIO_ReadInputDataBit(motorMap[id]->gpioPort, motorMap[id]->gpioPin) == Bit_RESET;
 }
 
-uint16_t motorsGetRatio(uint32_t id)
+int motorsGetRatio(uint32_t id)
 {
   ASSERT(id < NBR_OF_MOTORS);
 
@@ -741,25 +708,51 @@ PARAM_ADD_CORE(PARAM_UINT16, m4, &motorPowerSet[3])
 
 PARAM_GROUP_STOP(motorPowerSet)
 
-
 /**
  * Motor output related log variables.
  */
 LOG_GROUP_START(motor)
 /**
- * @brief Motor power (PWM value) for M1 [0 - UINT16_MAX]
+ * @brief Requested motor power (PWM value) for M1 [0 - UINT16_MAX]
  */
-LOG_ADD_CORE(LOG_UINT16, m1, &motor_ratios[MOTOR_M1])
+LOG_ADD_CORE(LOG_UINT32, m1, &motorPower[0])
 /**
- * @brief Motor power (PWM value) for M2 [0 - UINT16_MAX]
+ * @brief Requested motor power (PWM value) for M2 [0 - UINT16_MAX]
  */
-LOG_ADD_CORE(LOG_UINT16, m2, &motor_ratios[MOTOR_M2])
+LOG_ADD_CORE(LOG_UINT32, m2, &motorPower[1])
 /**
- * @brief Motor power (PWM value) for M3 [0 - UINT16_MAX]
+ * @brief Requested motor power (PWM value) for M3 [0 - UINT16_MAX]
  */
-LOG_ADD_CORE(LOG_UINT16, m3, &motor_ratios[MOTOR_M3])
+LOG_ADD_CORE(LOG_UINT32, m3, &motorPower[2])
 /**
- * @brief Motor power (PWM value) for M4 [0 - UINT16_MAX]
+ * @brief Requested motor power (PWM value) for M4 [0 - UINT16_MAX]
  */
-LOG_ADD_CORE(LOG_UINT16, m4, &motor_ratios[MOTOR_M4])
+LOG_ADD_CORE(LOG_UINT32, m4, &motorPower[3])
 LOG_GROUP_STOP(motor)
+
+
+/**
+ * Logging variables of the motors PWM output
+ */
+LOG_GROUP_START(pwm)
+/**
+ * @brief Current motor 1 PWM output
+ */ 
+LOG_ADD(LOG_UINT32, m1_pwm, &motor_ratios[0])
+/**
+ * @brief Current motor 2 PWM output
+ */ 
+LOG_ADD(LOG_UINT32, m2_pwm, &motor_ratios[1])
+/**
+ * @brief Current motor 3 PWM output
+ */ 
+LOG_ADD(LOG_UINT32, m3_pwm, &motor_ratios[2])
+/**
+ * @brief Current motor 4 PWM output
+ */ 
+LOG_ADD(LOG_UINT32, m4_pwm, &motor_ratios[3])
+/**
+ * @brief Cycle time of M1 output in microseconds
+ */
+LOG_ADD(LOG_UINT32, cycletime, &cycleTime)
+LOG_GROUP_STOP(pwm)

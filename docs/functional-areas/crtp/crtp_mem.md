@@ -11,13 +11,14 @@ Using the memory access gives the possibility to:
 
 Currently the following memories are supported:
 
--   Crazyflie 2.x onboard EEPROM
--   Crazyflie 2.x expansion board 1-wire memories
+-   Crazyflie 2.X onboard EEPROM
+-   Crazyflie 2.X expansion board 1-wire memories
 
 There\'s more information available for how the EEPROM is structured and
 how the 1-wire memories work and are structured.
 
-## Logical flow
+Logical flow
+============
 
 Getting information and reading/writing the memories is optional for the
 clients, but the -Crazyflie Python Client- always downloads information
@@ -25,7 +26,8 @@ about the memories on connect.
 
 ![crtp mem](/docs/images/crtp_mem.png)
 
-## Communication protocol
+Communication protocol
+======================
 
 The memory port uses 3 different channels:
 
@@ -35,7 +37,8 @@ The memory port uses 3 different channels:
   4          1             Read memories
   4          2             Write memories
 
-### Channel 0: Info/settings
+Channel 0: Info/settings
+------------------------
 
 This channel is used to get the number of memories present, information
 about the memories and the possibility to mass erase memories. The first

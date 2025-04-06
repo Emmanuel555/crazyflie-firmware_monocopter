@@ -40,6 +40,7 @@
 #include "ledseq.h"
 #include "pm.h"
 
+#include "config.h"
 #include "system.h"
 #include "platform.h"
 #include "storage.h"
@@ -55,7 +56,6 @@
 #include "console.h"
 #include "usblink.h"
 #include "mem.h"
-#include "crtp_mem.h"
 #include "proximity.h"
 #include "watchdog.h"
 #include "queuemonitor.h"
@@ -63,7 +63,6 @@
 #include "sound.h"
 #include "sysload.h"
 #include "estimator_kalman.h"
-#include "estimator_ukf.h"
 #include "deck.h"
 #include "extrx.h"
 #include "app.h"
@@ -73,18 +72,21 @@
 #include "i2cdev.h"
 #include "autoconf.h"
 #include "vcp_esc_passthrough.h"
-#if CONFIG_ENABLE_CPX
-  #include "cpxlink.h"
+
+#ifndef CONFIG_MOTORS_START_DISARMED
+#define ARM_INIT true
+#else
+#define ARM_INIT false
 #endif
 
 /* Private variable */
 static bool selftestPassed;
+static bool armed = ARM_INIT;
+static bool forceArm;
 static uint8_t dumpAssertInfo = 0;
 static bool isInit;
 
 static char nrf_version[16];
-static uint8_t testLogParam;
-static uint8_t doAssert;
 
 STATIC_MEM_TASK_ALLOC(systemTask, SYSTEM_TASK_STACKSIZE);
 
@@ -112,9 +114,6 @@ void systemInit(void)
 
   usblinkInit();
   sysLoadInit();
-#if CONFIG_ENABLE_CPX
-  cpxlinkInit();
-#endif
 
   /* Initialized here so that DEBUG_PRINT (buffered) can be used early */
   debugInit();
@@ -175,10 +174,10 @@ void systemTask(void *arg)
 #endif
 
 #ifdef CONFIG_DEBUG_PRINT_ON_UART1
-  uart1Init(CONFIG_DEBUG_PRINT_ON_UART1_BAUDRATE);
+  uart1Init(115200);
 #endif
 
-  usecTimerInit();
+  initUsecTimer();
   i2cdevInit(I2C3_DEV);
   i2cdevInit(I2C1_DEV);
   passthroughInit();
@@ -188,21 +187,12 @@ void systemTask(void *arg)
   commInit();
   commanderInit();
 
-  StateEstimatorType estimator = StateEstimatorTypeAutoSelect;
+  StateEstimatorType estimator = anyEstimator;
 
   #ifdef CONFIG_ESTIMATOR_KALMAN_ENABLE
   estimatorKalmanTaskInit();
   #endif
 
-  #ifdef CONFIG_ESTIMATOR_UKF_ENABLE
-  errorEstimatorUkfTaskInit();
-  #endif
-
-  // Enabling incoming syslink messages to be added to the queue.
-  // This should probably be done later, but deckInit() takes a long time if this is done later.
-  uartslkEnableIncoming();
-
-  memInit();
   deckInit();
   estimator = deckGetRequiredEstimator();
   stabilizerInit(estimator);
@@ -211,7 +201,7 @@ void systemTask(void *arg)
     platformSetLowInterferenceRadioMode();
   }
   soundInit();
-  crtpMemInit();
+  memInit();
 
 #ifdef PROXIMITY_ENABLED
   proximityInit();
@@ -253,13 +243,6 @@ void systemTask(void *arg)
   }
   #endif
 
-  #ifdef CONFIG_ESTIMATOR_UKF_ENABLE
-  if (errorEstimatorUkfTaskTest() == false) {
-    pass = false;
-    DEBUG_PRINT("estimatorUKFTask [FAIL]\n");
-  }
-  #endif
-
   if (deckTest() == false) {
     pass = false;
     DEBUG_PRINT("deck [FAIL]\n");
@@ -271,10 +254,6 @@ void systemTask(void *arg)
   if (memTest() == false) {
     pass = false;
     DEBUG_PRINT("mem [FAIL]\n");
-  }
-  if (crtpMemTest() == false) {
-    pass = false;
-    DEBUG_PRINT("CRTP mem [FAIL]\n");
   }
   if (watchdogNormalStartTest() == false) {
     pass = false;
@@ -353,6 +332,17 @@ void systemWaitStart(void)
   xSemaphoreGive(canStartMutex);
 }
 
+void systemSetArmed(bool val)
+{
+  armed = val;
+}
+
+bool systemIsArmed()
+{
+
+  return armed || forceArm;
+}
+
 void systemRequestShutdown()
 {
   SyslinkPacket slp;
@@ -409,12 +399,6 @@ void vApplicationIdleHook( void )
 #endif
 }
 
-static void doAssertCallback(void) {
-  if (doAssert) {
-    ASSERT_FAILED();
-  }
-}
-
 /**
  * This parameter group contain read-only parameters pertaining to the CPU
  * in the Crazyflie.
@@ -453,22 +437,14 @@ PARAM_GROUP_START(system)
 PARAM_ADD_CORE(PARAM_INT8 | PARAM_RONLY, selftestPassed, &selftestPassed)
 
 /**
+ * @brief Set to nonzero to force system to be armed
+ */
+PARAM_ADD(PARAM_INT8 | PARAM_PERSISTENT, forceArm, &forceArm)
+
+/**
  * @brief Set to nonzero to trigger dump of assert information to the log.
  */
 PARAM_ADD(PARAM_UINT8, assertInfo, &dumpAssertInfo)
-
-/**
- * @brief Test util for log and param. This param sets the value of the sys.testLogParam log variable.
- *
- */
-PARAM_ADD(PARAM_UINT8, testLogParam, &testLogParam)
-
-/**
- * @brief Set to non-zero to trigger a failed assert, useful for debugging
- *
- */
-PARAM_ADD_WITH_CALLBACK(PARAM_UINT8, doAssert, &doAssert, doAssertCallback)
-
 
 PARAM_GROUP_STOP(system)
 
@@ -477,8 +453,7 @@ PARAM_GROUP_STOP(system)
  */
 LOG_GROUP_START(sys)
 /**
- * @brief Test util for log and param. The value is set through the system.testLogParam parameter
+ * @brief If zero, arming system is preventing motors to start
  */
-LOG_ADD(LOG_INT8, testLogParam, &testLogParam)
-
+LOG_ADD(LOG_INT8, armed, &armed)
 LOG_GROUP_STOP(sys)

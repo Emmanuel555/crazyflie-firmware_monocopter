@@ -66,6 +66,7 @@ struct ootxDataFrame_s {
 
 typedef struct ootxDecoderState_s {
   int frameLength;
+  int bytesReceived;
 
   uint16_t currentWord;
 

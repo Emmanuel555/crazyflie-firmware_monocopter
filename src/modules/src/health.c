@@ -31,7 +31,7 @@
  * The battery test is done by doing a quick burst of all the motors while
  * measuring the maximum voltage sag. The sag is pretty constant over the
  * battery voltage range but usually a tiny bit higher at full voltage. The
- * result is heavily dependent on what components are mounted so needs
+ * result is heavily dependent on what components are monunted so needs
  * returning if anything is different/changed.
  *
  */
@@ -54,9 +54,8 @@ static bool startPropTest = false;
 static bool startBatTest = false;
 
 static uint16_t propTestPWMRatio = CONFIG_MOTORS_DEFAULT_PROP_TEST_PWM_RATIO;
-static uint16_t batTestPWMRatio = CONFIG_MOTORS_DEFAULT_BAT_TEST_PWM_RATIO;
 
-static uint32_t tick = 0;
+static uint32_t i = 0;
 NO_DMA_CCM_SAFE_ZERO_INIT static float accX[PROPTEST_NBR_OF_VARIANCE_VALUES];
 NO_DMA_CCM_SAFE_ZERO_INIT static float accY[PROPTEST_NBR_OF_VARIANCE_VALUES];
 NO_DMA_CCM_SAFE_ZERO_INIT static float accZ[PROPTEST_NBR_OF_VARIANCE_VALUES];
@@ -136,7 +135,6 @@ bool healthShallWeRunTest(void)
   } else if (startBatTest != false) {
     testState = testBattery;
     startBatTest = false;
-    tick = 0;
   }
 
   return (testState != testDone);
@@ -163,13 +161,13 @@ void healthRunTests(sensorData_t *sensors)
   }
   if (testState == measureNoiseFloor)
   {
-    accX[tick] = sensors->acc.x;
-    accY[tick] = sensors->acc.y;
-    accZ[tick] = sensors->acc.z;
+    accX[i] = sensors->acc.x;
+    accY[i] = sensors->acc.y;
+    accZ[i] = sensors->acc.z;
 
-    if (++tick >= PROPTEST_NBR_OF_VARIANCE_VALUES)
+    if (++i >= PROPTEST_NBR_OF_VARIANCE_VALUES)
     {
-      tick = 0;
+      i = 0;
       accVarXnf = variance(accX, PROPTEST_NBR_OF_VARIANCE_VALUES);
       accVarYnf = variance(accY, PROPTEST_NBR_OF_VARIANCE_VALUES);
       accVarZnf = variance(accZ, PROPTEST_NBR_OF_VARIANCE_VALUES);
@@ -182,7 +180,7 @@ void healthRunTests(sensorData_t *sensors)
   {
     healthTestSettings = motorsGetHealthTestSettings(motorToTest);
 
-    sampleIndex = ((int32_t) tick) - healthTestSettings->varianceMeasurementStartMsec;
+    sampleIndex = ((int32_t) i) - healthTestSettings->varianceMeasurementStartMsec;
     if (sampleIndex >= 0 && sampleIndex < PROPTEST_NBR_OF_VARIANCE_VALUES)
     {
       accX[sampleIndex] = sensors->acc.x;
@@ -193,7 +191,7 @@ void healthRunTests(sensorData_t *sensors)
         minSingleLoadedVoltage[motorToTest] = pmGetBatteryVoltage();
       }
     }
-    tick++;
+    i++;
 
     if (sampleIndex == PROPTEST_NBR_OF_VARIANCE_VALUES)
     {
@@ -207,65 +205,64 @@ void healthRunTests(sensorData_t *sensors)
                    (double)(idleVoltage - minSingleLoadedVoltage[motorToTest]));
     }
 
-    if (tick == 1 && healthTestSettings->onPeriodMsec > 0)
+    if (i == 1 && healthTestSettings->onPeriodMsec > 0)
     {
-      motorsSetRatio(motorToTest, propTestPWMRatio > 0 ? propTestPWMRatio : healthTestSettings->onPeriodPWMRatioProp);
+      motorsSetRatio(motorToTest, propTestPWMRatio > 0 ? propTestPWMRatio : healthTestSettings->onPeriodPWMRatio);
     }
-    else if (tick == healthTestSettings->onPeriodMsec)
+    else if (i == healthTestSettings->onPeriodMsec)
     {
       motorsSetRatio(motorToTest, 0);
     }
-    else if (tick >= healthTestSettings->onPeriodMsec + healthTestSettings->offPeriodMsec)
+    else if (i >= healthTestSettings->onPeriodMsec + healthTestSettings->offPeriodMsec)
     {
-      tick = 0;
+      i = 0;
       motorToTest++;
       if (motorToTest >= NBR_OF_MOTORS)
       {
-        tick = 0;
+        i = 0;
         motorToTest = 0;
         testState = evaluatePropResult;
         sensorsSetAccMode(ACC_MODE_FLIGHT);
       }
     }
   }
-  /* Experimental battery test, tick should count up each ms */
+  /* Experimental battery test, i should count up each ms */
   else if (testState == testBattery)
   {
-    healthTestSettings = motorsGetHealthTestSettings(0);
-
-    if (tick == 0)
+    if (i == 0)
     {
       batteryPass = 0;
       minLoadedVoltage = idleVoltage = pmGetBatteryVoltage();
     }
-    if (tick == 1)
+    if (i == 1)
     {
-      motorsSetRatio(MOTOR_M1, batTestPWMRatio > 0 ? batTestPWMRatio : healthTestSettings->onPeriodPWMRatioBat);
-      motorsSetRatio(MOTOR_M2, batTestPWMRatio > 0 ? batTestPWMRatio : healthTestSettings->onPeriodPWMRatioBat);
-      motorsSetRatio(MOTOR_M3, batTestPWMRatio > 0 ? batTestPWMRatio : healthTestSettings->onPeriodPWMRatioBat);
-      motorsSetRatio(MOTOR_M4, batTestPWMRatio > 0 ? batTestPWMRatio : healthTestSettings->onPeriodPWMRatioBat);
+      motorsSetRatio(MOTOR_M1, 0xFFFF);
+      motorsSetRatio(MOTOR_M2, 0xFFFF);
+      motorsSetRatio(MOTOR_M3, 0xFFFF);
+      motorsSetRatio(MOTOR_M4, 0xFFFF);
     }
-    else if (tick < 50)
+    else if (i < 50)
     {
       if (pmGetBatteryVoltage() < minLoadedVoltage)
         minLoadedVoltage = pmGetBatteryVoltage();
     }
-    else if (tick == 50)
+    else if (i == 50)
     {
       motorsStop();
       testState = evaluateBatResult;
+      i = 0;
     }
-    tick++;
+    i++;
   }
   else if (testState == restartBatTest)
   {
     // Mainly used for testing
-    if (tick++ > 2000)
+    if (i++ > 2000)
     {
       DEBUG_PRINT("Idle:%.2f sag: %.2f\n", (double)idleVoltage,
                   (double)(idleVoltage - minLoadedVoltage));
       testState = testBattery;
-      tick = 0;
+      i = 0;
     }
   }
   else if (testState == evaluateBatResult)
@@ -337,12 +334,7 @@ PARAM_ADD_CORE(PARAM_UINT8, startBatTest, &startBatTest)
 /**
  * @brief PWM ratio to use when testing propellers. Required for brushless motors. [0 - UINT16_MAX]
  */
-PARAM_ADD_CORE(PARAM_UINT16 | PARAM_PERSISTENT, propTestPWMRatio, &propTestPWMRatio)
-
-/**
- * @brief PWM ratio to use when testing the battery. [0 - UINT16_MAX]
- */
-PARAM_ADD_CORE(PARAM_UINT16 | PARAM_PERSISTENT, batTestPWMRatio, &batTestPWMRatio)
+PARAM_ADD_CORE(PARAM_UINT16, propTestPWMRatio, &propTestPWMRatio)
 
 PARAM_GROUP_STOP(health)
 

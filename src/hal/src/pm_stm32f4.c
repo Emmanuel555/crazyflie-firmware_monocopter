@@ -21,7 +21,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
- * pm_stm32f4.c - Power Management driver and functions.
+ * pm.c - Power Management driver and functions.
  */
 
 #include "stm32fxxx.h"
@@ -57,10 +57,9 @@ typedef struct _PmSyslinkInfo
     uint8_t flags;
     struct
     {
-      uint8_t isCharging   : 1;
-      uint8_t usbPluggedIn : 1;
-      uint8_t canCharge    : 1;
-      uint8_t unused       : 5;
+      uint8_t chg    : 1;
+      uint8_t pgood  : 1;
+      uint8_t unused : 6;
     };
   };
   float vBat;
@@ -102,8 +101,6 @@ static PMStates pmState;
 static PmSyslinkInfo pmSyslinkInfo;
 
 static uint8_t batteryLevel;
-
-static bool ignoreChargedState = false;
 
 static void pmSetBatteryVoltage(float voltage);
 
@@ -213,7 +210,7 @@ float pmGetBatteryVoltageMax(void)
  * When a module wants to register a callback to be called on shutdown they
  * call pmRegisterGracefulShutdownCallback(graceful_shutdown_callback_t),
  * with a function they which to be run at shutdown. We currently support
- * GRACEFUL_SHUTDOWN_MAX_CALLBACKS number of callbacks to be registered.
+ * GRACEFUL_SHUTDOWN_MAX_CALLBACKS number of callbacks to be registred.
  */
 #define GRACEFUL_SHUTDOWN_MAX_CALLBACKS 5
 static int graceful_shutdown_callbacks_index;
@@ -225,7 +222,7 @@ static graceful_shutdown_callback_t graceful_shutdown_callbacks[GRACEFUL_SHUTDOW
  */
 bool pmRegisterGracefulShutdownCallback(graceful_shutdown_callback_t cb)
 {
-  // To many registered already! Increase limit if you think you are important
+  // To many registered allready! Increase limit if you think you are important
   // enough!
   if (graceful_shutdown_callbacks_index >= GRACEFUL_SHUTDOWN_MAX_CALLBACKS) {
     return false;
@@ -256,29 +253,11 @@ static void pmGracefulShutdown()
   syslinkSendPacket(&slp);
 }
 
-static void pmEnableBatteryStatusAutoupdate()
-{
-  SyslinkPacket slp = {
-    .type = SYSLINK_PM_BATTERY_AUTOUPDATE,
-  };
-
-  syslinkSendPacket(&slp);
-}
-
 void pmSyslinkUpdate(SyslinkPacket *slp)
 {
   if (slp->type == SYSLINK_PM_BATTERY_STATE) {
-    // First byte of the packet contains some PM flags such as USB power, charging etc.
     memcpy(&pmSyslinkInfo, &slp->data[0], sizeof(pmSyslinkInfo));
-
-    // If using voltage measurements from external battery, we'll set the
-    // voltage to this instead of the one sent from syslink.
-    if (isExtBatVoltDeckPinSet) {
-      pmSetBatteryVoltage(extBatteryVoltage);
-    } else {
-      pmSetBatteryVoltage(pmSyslinkInfo.vBat);
-    }
-
+    pmSetBatteryVoltage(pmSyslinkInfo.vBat);
 #ifdef PM_SYSTLINK_INLCUDE_TEMP
     temp = pmSyslinkInfo.temp;
 #endif
@@ -289,42 +268,36 @@ void pmSyslinkUpdate(SyslinkPacket *slp)
 
 void pmSetChargeState(PMChargeStates chgState)
 {
-  // TODO: Send syslink package with charge state
+  // TODO: Send syslink packafe with charge state
 }
 
 PMStates pmUpdateState()
 {
-  bool usbPluggedIn = pmSyslinkInfo.usbPluggedIn;
-  bool isCharging = pmSyslinkInfo.isCharging;
-  PMStates nextState;
+  PMStates state;
+  bool isCharging = pmSyslinkInfo.chg;
+  bool isPgood = pmSyslinkInfo.pgood;
+  uint32_t batteryLowTime;
 
-  uint32_t batteryLowTime = xTaskGetTickCount() - batteryLowTimeStamp;
+  batteryLowTime = xTaskGetTickCount() - batteryLowTimeStamp;
 
-  if (ignoreChargedState)
+  if (isPgood && !isCharging)
   {
-    // For some scenarios we might not care about the charging/charged state.
-    nextState = battery;
+    state = charged;
   }
-  else if (usbPluggedIn && !isCharging)
+  else if (isPgood && isCharging)
   {
-    nextState = charged;
+    state = charging;
   }
-  else if (usbPluggedIn && isCharging)
+  else if (!isPgood && !isCharging && (batteryLowTime > PM_BAT_LOW_TIMEOUT))
   {
-    nextState = charging;
+    state = lowPower;
   }
   else
   {
-    nextState = battery;
+    state = battery;
   }
 
-  if (nextState == battery && batteryLowTime > PM_BAT_LOW_TIMEOUT)
-  {
-    // This is to avoid setting state to lowPower when we're plugged in to USB.
-    nextState = lowPower;
-  }
-
-  return nextState;
+  return state;
 }
 
 void pmEnableExtBatteryCurrMeasuring(const deckPin_t pin, float ampPerVolt)
@@ -373,10 +346,6 @@ float pmMeasureExtBatteryVoltage(void)
   return voltage;
 }
 
-void pmIgnoreChargedState(bool ignore) {
-  ignoreChargedState = ignore;
-}
-
 bool pmIsBatteryLow(void) {
   return (pmState == lowPower);
 }
@@ -407,10 +376,6 @@ void pmTask(void *param)
 
   pmSetChargeState(charge500mA);
   systemWaitStart();
-
-  // Continuous battery voltage and status messages must be enabled
-  // after system startup to avoid syslink queue overflow.
-  pmEnableBatteryStatusAutoupdate();
 
   while(1)
   {

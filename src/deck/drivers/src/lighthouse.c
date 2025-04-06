@@ -60,7 +60,7 @@ static void lighthouseInit(DeckInfo *info)
   lighthouseCoreInit();
 
   xTaskCreate(lighthouseCoreTask, LIGHTHOUSE_TASK_NAME,
-              LIGHTHOUSE_TASK_STACKSIZE, NULL, LIGHTHOUSE_TASK_PRI, NULL);
+              2*configMINIMAL_STACK_SIZE, NULL, LIGHTHOUSE_TASK_PRI, NULL);
 
   xTimerHandle timer;
   timer = xTimerCreateStatic("ledTimer", M2T(FIFTH_SECOND), pdTRUE,
@@ -91,7 +91,7 @@ static const DeckDriver lighthouse_deck = {
 
   .usedGpio = 0,
   .usedPeriph = DECK_USING_UART1,
-  .requiredEstimator = StateEstimatorTypeKalman,
+  .requiredEstimator = kalmanEstimator,
 
   .memoryDef = &memoryDef,
 
