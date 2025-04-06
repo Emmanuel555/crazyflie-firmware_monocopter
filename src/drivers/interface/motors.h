@@ -65,7 +65,8 @@
  *
  * Generates a PWM wave at 2000 Hz update rate, with 125 - 250us high pulse, using the timer.
  */
-  #define BLMC_PERIOD 0.0005   // 0.5ms = 2000Hz
+  // #define BLMC_PERIOD 0.0005  // 0.5ms = 2000Hz
+  #define BLMC_PERIOD 0.02  // recently added -Emmanuel
   #define MOTORS_HIGH_PERIOD_ZERO  0.000125 // 125us for zero throttle
 
   #define MOTORS_BL_PWM_PRESCALE_RAW   (uint32_t)((TIM_CLOCK_HZ/0xFFFF) * BLMC_PERIOD + 1) // +1 is to not end up above 0xFFFF in the end
