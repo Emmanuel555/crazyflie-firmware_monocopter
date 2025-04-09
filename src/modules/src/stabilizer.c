@@ -180,8 +180,8 @@ void stabilizerInit(StateEstimatorType estimator)
 
   sensorsInit();
   stateEstimatorInit(estimator);
-  // controllerInit(ControllerTypeAny); emma
-  controllerInit(ControllerTypeINDI);
+  controllerInit(ControllerTypeAny); // emma
+  //controllerInit(ControllerTypeINDI);
   powerDistributionInit();
   motorsInit(platformConfigGetMotorMapping());
   collisionAvoidanceInit();
@@ -372,22 +372,6 @@ PARAM_ADD_CORE(PARAM_UINT8, controller, &controllerType)
  */
 PARAM_ADD_CORE(PARAM_UINT8, stop, &emergencyStop)
 PARAM_GROUP_STOP(stabilizer)
-
-
-/**
- * Log group for the current controller target
- *
- * Note: all members may not be updated depending on how the system is used
- */
-
-LOG_GROUP_START(control_scheme)
-
-/**
- * @brief Controller type INDI
- */
-LOG_ADD_CORE(LOG_UINT8, control_scheme_chosen, &controllerType)
-
-LOG_GROUP_STOP(control_scheme)
 
 
 LOG_GROUP_START(ctrltarget)

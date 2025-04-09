@@ -11,7 +11,6 @@
 
 //#define DEFAULT_CONTROLLER ControllerTypePID //used to be the default controller
 #define DEFAULT_CONTROLLER ControllerTypeINDI //emma
-#define CONFIG_CONTROLLER_INDI //emma
 static ControllerType currentController = ControllerTypeAny;
 
 static void initController();
