@@ -492,15 +492,15 @@ LOG_ADD(LOG_FLOAT, ang_accel_ref_r, &indi.angular_accel_ref.r)
 /**
  * @brief INDI derived angular acceleration from filtered gyroscope measurement, roll [rad/s^2]
  */
-LOG_ADD(LOG_FLOAT, rate_d[0], &indi.rate_d[0])
+LOG_ADD(LOG_FLOAT, rate_d_roll, &indi.rate_d[0])
 /**
  * @brief INDI derived angular acceleration from filtered gyroscope measurement, pitch [rad/s^2]
  */
-LOG_ADD(LOG_FLOAT, rate_d[1], &indi.rate_d[1])
+LOG_ADD(LOG_FLOAT, rate_d_pitch, &indi.rate_d[1])
 /**
  * @brief INDI derived angular acceleration from filtered gyroscope measurement, yaw [rad/s^2]
  */
-LOG_ADD(LOG_FLOAT, rate_d[2], &indi.rate_d[2])
+LOG_ADD(LOG_FLOAT, rate_d_yaw, &indi.rate_d[2])
 
 /**
  * @brief INDI filtered (8Hz low-pass) roll motor input from previous time step [motor units]
