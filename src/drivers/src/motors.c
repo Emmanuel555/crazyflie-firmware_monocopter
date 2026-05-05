@@ -48,6 +48,19 @@
 static bool motorSetEnable = false;
 static uint32_t motorPower[] = {0, 0, 0, 0};    // user-requested PWM signals
 static uint16_t motorPowerSet[] = {0, 0, 0, 0}; // user-requested PWM signals (overrides)
+
+static uint8_t motorDirection = 0;  // 0 = forward, 1 = reverse
+static uint8_t motorDirectionTrigger = 0;  // set to 1 to trigger change
+static void motorsDirectionTask(void *param) {
+    while (1) {
+        if (motorDirectionTrigger) {
+            motorDirectionTrigger = 0;
+            motorsSetDirection(MOTOR_M1, motorDirection);
+        }
+        vTaskDelay(M2T(10));
+    }
+}
+
 static uint32_t motor_ratios[] = {0, 0, 0, 0};  // actual PWM signals
 
 #ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT
@@ -274,6 +287,9 @@ void motorsInit(const MotorPerifDef** motorMapSelect)
 
   // Output zero power
   motorsStop();
+
+  // Direction change task
+  xTaskCreate(motorsDirectionTask, "MDIR", 512, NULL, 2, NULL);
 }
 
 void motorsDeInit(const MotorPerifDef** motorMapSelect)
@@ -368,6 +384,67 @@ static void motorsDshotDMASetup()
     NVIC_Init(&NVIC_InitStructure);
   }
 }
+
+#ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT
+void motorsPrepareDshotCommand(uint32_t id, uint16_t command)
+{
+    uint16_t dshotBits;
+    bool dshot_telemetry = true;  // must be 1 for special commands
+
+    ASSERT(id < NBR_OF_MOTORS);
+
+    dshotBits = (command << 1) | (dshot_telemetry ? 1 : 0);
+
+    // compute checksum
+    unsigned cs = 0;
+    unsigned csData = dshotBits;
+    for (int i = 0; i < 3; i++)
+    {
+        cs ^= csData;
+        csData >>= 4;
+    }
+    cs &= 0xf;
+    dshotBits = (dshotBits << 4) | cs;
+
+    for (int i = 0; i < DSHOT_FRAME_SIZE; i++)
+    {
+        dshotDmaBuffer[id][i] = (dshotBits & 0x8000) ? MOTORS_TIM_VALUE_FOR_1 : MOTORS_TIM_VALUE_FOR_0;
+        dshotBits <<= 1;
+    }
+    dshotDmaBuffer[id][16] = 0;
+
+    while(DMA_GetCmdStatus(motorMap[id]->DMA_stream) != DISABLE)
+    {
+        dmaWait++;
+    }
+}
+
+void motorsSetDirection(uint32_t id, uint8_t direction)
+{
+    // Stop motor first
+    motorsSetRatio(id, 0);
+    motorsBurstDshot();
+    vTaskDelay(M2T(300));
+
+    // Send direction command 6 times (7 = forward, 8 = reverse)
+    uint16_t cmd = (direction == 0) ? 7 : 8;
+    for (int i = 0; i < 6; i++)
+    {
+        motorsPrepareDshotCommand(id, cmd);
+        motorsBurstDshot();
+        vTaskDelay(M2T(10));
+    }
+
+    // Save settings 6 times
+    for (int i = 0; i < 6; i++)
+    {
+        motorsPrepareDshotCommand(id, 12);
+        motorsBurstDshot();
+        vTaskDelay(M2T(10));
+    }
+}
+#endif
+
 static void motorsPrepareDshot(uint32_t id, uint16_t ratio)
 {
   uint16_t dshotBits;
@@ -756,3 +833,9 @@ LOG_ADD(LOG_UINT32, m4_pwm, &motor_ratios[3])
  */
 LOG_ADD(LOG_UINT32, cycletime, &cycleTime)
 LOG_GROUP_STOP(pwm)
+
+/** Motor direction parameters */
+PARAM_GROUP_START(motorDir)
+PARAM_ADD(PARAM_UINT8, direction, &motorDirection)
+PARAM_ADD(PARAM_UINT8, trigger, &motorDirectionTrigger)
+PARAM_GROUP_STOP(motorDir)

@@ -346,6 +346,17 @@ void motorsTestTask(void* params);
  * */
 void motorsBeep(int id, bool enable, uint16_t frequency, uint16_t ratio);
 
+/** 
+ * Set the direction of the motor. This is only used for brushless motors, 
+ * for brushed motors the direction is determined by the wiring.
+ * The direction is set by sending a specific DSHOT command to the ESC, 
+ * so it will be saved in the ESC and used on next power up. 
+ * The function will first stop the motor, then send the direction command 6 times, 
+ * and finally send the save settings command 6 times. 
+ * The direction parameter is 0 for FORWARD and 1 for REVERSE.
+*/
+void motorsSetDirection(uint32_t id, uint8_t direction);
+
 /**
  * Retrieve the health test settings of the given motor. This allows us to use
  * different health test timings and PWM ratios for brushed and brushless motors.
