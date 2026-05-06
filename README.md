@@ -4,6 +4,8 @@ run the following:
 # command
 ~/.local/bin/cfloader flash bolt.bin stm32-fw
 
+# Crazyflie Bolt....Always
+make bolt_defconfig
 
 
 

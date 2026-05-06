@@ -46,7 +46,7 @@
 #include "param.h"
 
 //testing param grp
-static uint8_t testParam = 42;
+//static uint8_t testParam = 42;
 
 static bool motorSetEnable = false;
 static uint32_t motorPower[] = {0, 0, 0, 0};    // user-requested PWM signals
@@ -847,6 +847,7 @@ PARAM_ADD(PARAM_UINT8, done, &motorDirectionDone)
 PARAM_GROUP_STOP(motorDir)
 
 /** Testing parameters */
-PARAM_GROUP_START(test)
+/* PARAM_GROUP_START(test)
 PARAM_ADD(PARAM_UINT8, value, &testParam)
 PARAM_GROUP_STOP(test)
+ */
