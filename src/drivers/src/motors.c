@@ -55,6 +55,7 @@ static uint16_t motorPowerSet[] = {0, 0, 0, 0}; // user-requested PWM signals (o
 static uint8_t motorDirection = 0;  // 0 = forward, 1 = reverse
 static uint8_t motorDirectionTrigger = 0;  // set to 1 to trigger change
 static uint8_t motorDirectionDone = 0; // set to 1 when direction change is done
+#ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT
 static void motorsDirectionTask(void *param) {
     while (1) {
         if (motorDirectionTrigger) {
@@ -65,6 +66,7 @@ static void motorsDirectionTask(void *param) {
         vTaskDelay(M2T(10));
     }
 }
+#endif
 
 static uint32_t motor_ratios[] = {0, 0, 0, 0};  // actual PWM signals
 
@@ -281,6 +283,8 @@ void motorsInit(const MotorPerifDef** motorMapSelect)
   }
 #ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT
   motorsDshotDMASetup();
+  // Direction change task
+  xTaskCreate(motorsDirectionTask, "MDIR", 512, NULL, 2, NULL);
 #endif
   // Start the timers
   for (i = 0; i < NBR_OF_MOTORS; i++)
@@ -293,8 +297,6 @@ void motorsInit(const MotorPerifDef** motorMapSelect)
   // Output zero power
   motorsStop();
 
-  // Direction change task
-  xTaskCreate(motorsDirectionTask, "MDIR", 512, NULL, 2, NULL);
 }
 
 void motorsDeInit(const MotorPerifDef** motorMapSelect)
