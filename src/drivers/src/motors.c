@@ -45,17 +45,22 @@
 #include "log.h"
 #include "param.h"
 
+//testing param grp
+static uint8_t testParam = 42;
+
 static bool motorSetEnable = false;
 static uint32_t motorPower[] = {0, 0, 0, 0};    // user-requested PWM signals
 static uint16_t motorPowerSet[] = {0, 0, 0, 0}; // user-requested PWM signals (overrides)
 
 static uint8_t motorDirection = 0;  // 0 = forward, 1 = reverse
 static uint8_t motorDirectionTrigger = 0;  // set to 1 to trigger change
+static uint8_t motorDirectionDone = 0; // set to 1 when direction change is done
 static void motorsDirectionTask(void *param) {
     while (1) {
         if (motorDirectionTrigger) {
             motorDirectionTrigger = 0;
             motorsSetDirection(MOTOR_M1, motorDirection);
+            motorDirectionDone = 1;
         }
         vTaskDelay(M2T(10));
     }
@@ -385,7 +390,6 @@ static void motorsDshotDMASetup()
   }
 }
 
-#ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT
 void motorsPrepareDshotCommand(uint32_t id, uint16_t command)
 {
     uint16_t dshotBits;
@@ -443,7 +447,6 @@ void motorsSetDirection(uint32_t id, uint8_t direction)
         vTaskDelay(M2T(10));
     }
 }
-#endif
 
 static void motorsPrepareDshot(uint32_t id, uint16_t ratio)
 {
@@ -838,4 +841,10 @@ LOG_GROUP_STOP(pwm)
 PARAM_GROUP_START(motorDir)
 PARAM_ADD(PARAM_UINT8, direction, &motorDirection)
 PARAM_ADD(PARAM_UINT8, trigger, &motorDirectionTrigger)
+PARAM_ADD(PARAM_UINT8, done, &motorDirectionDone)
 PARAM_GROUP_STOP(motorDir)
+
+/** Testing parameters */
+PARAM_GROUP_START(test)
+PARAM_ADD(PARAM_UINT8, value, &testParam)
+PARAM_GROUP_STOP(test)

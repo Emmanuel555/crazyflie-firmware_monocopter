@@ -355,6 +355,7 @@ void motorsBeep(int id, bool enable, uint16_t frequency, uint16_t ratio);
  * and finally send the save settings command 6 times. 
  * The direction parameter is 0 for FORWARD and 1 for REVERSE.
 */
+void motorsPrepareDshotCommand(uint32_t id, uint16_t command);
 void motorsSetDirection(uint32_t id, uint8_t direction);
 
 /**

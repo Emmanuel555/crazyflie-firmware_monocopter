@@ -1,6 +1,5 @@
 # Flashing to CF Bolt
-
-Go to firmware folder, then go to build folder and run the following:
+run the following:
 
 # command
 ~/.local/bin/cfloader flash bolt.bin stm32-fw
