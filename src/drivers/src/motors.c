@@ -52,14 +52,14 @@ static bool motorSetEnable = false;
 static uint32_t motorPower[] = {0, 0, 0, 0};    // user-requested PWM signals
 static uint16_t motorPowerSet[] = {0, 0, 0, 0}; // user-requested PWM signals (overrides)
 
-static uint8_t motorDirection = 0;  // 0 = forward, 1 = reverse
+/* static uint8_t motorDirection = 0;  // 0 = forward, 1 = reverse
 static uint8_t motorDirectionTrigger = 0;  // set to 1 to trigger change
 static uint8_t motorDirectionDone = 0; // set to 1 when direction change is done
 
 #ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT
 static void motorsDirectionTask(void *param) {
     while (1) {
-        DEBUG_PRINT("MDIR task running, trigger=%d\n", motorDirectionTrigger);
+        //DEBUG_PRINT("MDIR task running, trigger=%d\n", motorDirectionTrigger);
         if (motorDirectionTrigger) {
             motorDirectionTrigger = 0;
             motorsSetDirection(MOTOR_M1, motorDirection);
@@ -72,7 +72,7 @@ static void motorsDirectionTask(void *param) {
         vTaskDelay(M2T(10));
     }
 }
-#endif
+#endif */
 
 static uint32_t motor_ratios[] = {0, 0, 0, 0};  // actual PWM signals
 
@@ -291,7 +291,7 @@ void motorsInit(const MotorPerifDef** motorMapSelect)
   #ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT
     motorsDshotDMASetup();
     // Direction change task
-    xTaskCreate(motorsDirectionTask, "MDIR", 512, NULL, 2, NULL);
+    //xTaskCreate(motorsDirectionTask, "MDIR", 512, NULL, 2, NULL);
   #endif
 
   // Start the timers
@@ -400,7 +400,7 @@ static void motorsDshotDMASetup()
   }
 }
 
-void motorsPrepareDshotCommand(uint32_t id, uint16_t command)
+/* void motorsPrepareDshotCommand(uint32_t id, uint16_t command)
 {
     uint16_t dshotBits;
     bool dshot_telemetry = true;  // must be 1 for special commands
@@ -456,7 +456,7 @@ void motorsSetDirection(uint32_t id, uint8_t direction)
         motorsBurstDshot();
         vTaskDelay(M2T(10));
     }
-}
+} */
 
 static void motorsPrepareDshot(uint32_t id, uint16_t ratio)
 {
@@ -848,11 +848,11 @@ LOG_ADD(LOG_UINT32, cycletime, &cycleTime)
 LOG_GROUP_STOP(pwm)
 
 /** Motor direction parameters */
-PARAM_GROUP_START(motorDir)
+/* PARAM_GROUP_START(motorDir)
 PARAM_ADD(PARAM_UINT8, direction, &motorDirection)
 PARAM_ADD(PARAM_UINT8, trigger, &motorDirectionTrigger)
 PARAM_ADD(PARAM_UINT8, done, &motorDirectionDone)
-PARAM_GROUP_STOP(motorDir)
+PARAM_GROUP_STOP(motorDir) */
 
 /** Testing parameters */
 /* PARAM_GROUP_START(test)

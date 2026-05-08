@@ -282,6 +282,7 @@ static void stabilizerTask(void* param)
 
       controller(&control, &setpoint, &sensorData, &state, tick); // INDI controller function runs on this line
         
+      // assigned setpoints are auto-logged and assigned to control values below - emma
       control.thrust = setpoint.position.x;  
       control.thrust_2 = setpoint.position.y; 
       control.thrust_3 = setpoint.position.z; 
@@ -305,7 +306,7 @@ static void stabilizerTask(void* param)
         motorsSetRatio(MOTOR_M4, motorPower.m4);  //modified
 
       } else {
-        powerDistribution(&motorPower, &control);
+        powerDistribution(&motorPower, &control); // assign all to motor values physically - emma
         motorsSetRatio(MOTOR_M1, motorPower.m1);
         motorsSetRatio(MOTOR_M2, motorPower.m2);
         motorsSetRatio(MOTOR_M3, motorPower.m3);
