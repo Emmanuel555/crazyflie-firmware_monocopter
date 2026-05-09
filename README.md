@@ -1,4 +1,6 @@
 # Monocopter Ver
+DISABLE the following cos NO telem provided...
+- Enable bi-directional DSHOT (RPM measurements)  
 
 # Crazyflie Firmware  [![CI](https://github.com/bitcraze/crazyflie-firmware/workflows/CI/badge.svg)](https://github.com/bitcraze/crazyflie-firmware/actions?query=workflow%3ACI)
 
