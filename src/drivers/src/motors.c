@@ -55,7 +55,7 @@
 #include "log.h"
 #include "param.h"
 
-static uint8_t motorSetEnable = 0;
+static uint8_t motorSetEnable = 0; // setting this to 1 overrides python sending
 static uint16_t motorPowerSet[] = {0, 0, 0, 0}; // user-requested PWM signals (overrides)
 static uint16_t motor_ratios[] = {0, 0, 0, 0};  // actual PWM signals
 static uint16_t timPolarity;

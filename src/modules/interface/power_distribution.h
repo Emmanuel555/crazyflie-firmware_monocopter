@@ -40,6 +40,9 @@ bool powerDistributionTest(void);
  */
 void powerDistribution(const control_t *control, motors_thrust_uncapped_t* motorThrustUncapped);
 
+// for monocopter
+void monocoPowerDistribution(const control_t *control, motors_thrust_uncapped_t* motorThrustUncapped);
+
 /**
  * @brief Cap the thrust for the motors when out side of the valid range [0 - UINT16_MAX]. The platform specific
  * implementation can chose to cap the trust in a way that provides graceful degradation, for instance prioritizing

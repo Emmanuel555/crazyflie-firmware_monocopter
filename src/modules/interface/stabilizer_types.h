@@ -198,6 +198,9 @@ typedef struct control_s {
       int16_t pitch;
       int16_t yaw;
       float thrust;
+      float thrust_2;  // add here
+      float thrust_3;  // add here
+      float thrust_4;  // add here
     };
 
     // controlModeForceTorque

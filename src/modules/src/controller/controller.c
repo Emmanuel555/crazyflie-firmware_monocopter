@@ -11,7 +11,8 @@
 
 #include "autoconf.h"
 
-#define DEFAULT_CONTROLLER ControllerTypePID
+//#define DEFAULT_CONTROLLER ControllerTypePID // added
+#define DEFAULT_CONTROLLER ControllerTypeINDI // added
 static ControllerType currentController = ControllerTypeAutoSelect;
 
 static void initController();

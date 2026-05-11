@@ -253,7 +253,8 @@ static void logCapWarning(const bool isCapped) {
 }
 
 static void controlMotors(const control_t* control) {
-  powerDistribution(control, &motorThrustUncapped);
+  //powerDistribution(control, &motorThrustUncapped);
+  monocoPowerDistribution(control, &motorThrustUncapped); // monocopter power distribution
   batteryCompensation(&motorThrustUncapped, &motorThrustBatCompUncapped);
   const bool isCapped = powerDistributionCap(&motorThrustBatCompUncapped, &motorPwm);
   logCapWarning(isCapped);
@@ -326,10 +327,12 @@ static void stabilizerTask(void* param)
 
       stateEstimator(&state, stabilizerStep);
 
-      const bool areMotorsAllowedToRun = supervisorAreMotorsAllowedToRun();
+      //const bool areMotorsAllowedToRun = supervisorAreMotorsAllowedToRun(); // bypass sup checks for now
+
+      //const bool areMotorsAllowedToRun = 1;//
 
       // Critical for safety, be careful if you modify this code!
-      crtpCommanderBlock(! areMotorsAllowedToRun);
+      //crtpCommanderBlock(! areMotorsAllowedToRun);//
 
       if (crtpCommanderHighLevelGetSetpoint(&tempSetpoint, &state, stabilizerStep)) {
         commanderSetSetpoint(&tempSetpoint, COMMANDER_PRIORITY_HIGHLEVEL);
@@ -341,24 +344,30 @@ static void stabilizerTask(void* param)
       supervisorUpdate(&sensorData, &setpoint, stabilizerStep);
 
       // Let the collision avoidance module modify the setpoint, if needed
-      collisionAvoidanceUpdateSetpoint(&setpoint, &sensorData, &state, stabilizerStep);
+      collisionAvoidanceUpdateSetpoint(&setpoint, &sensorData, &state, stabilizerStep);//
 
       // Critical for safety, be careful if you modify this code!
       // Let the supervisor modify the setpoint to handle exceptional conditions
-      supervisorOverrideSetpoint(&setpoint);
+      //supervisorOverrideSetpoint(&setpoint);//
 
       controller(&control, &setpoint, &sensorData, &state, stabilizerStep);
 
+      // assigned setpoints are auto-logged and assigned to control values below - emma legacy code
+      control.thrust = setpoint.position.x;  
+      control.thrust_2 = setpoint.position.y; 
+      control.thrust_3 = setpoint.position.z; 
+      control.thrust_4 = setpoint.attitude.yaw; 
+
       // Critical for safety, be careful if you modify this code!
       // The supervisor will already set thrust to 0 in the setpoint if needed, but to be extra sure prevent motors from running.
-      if (areMotorsAllowedToRun) {
-        controlMotors(&control);
+      //if (areMotorsAllowedToRun) {//
+      controlMotors(&control);
 #ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT
         motorsBurstDshot();
 #endif
-      } else {
-        motorsStop();
-      }
+      //} else {
+      //  motorsStop();
+      //}
 
       // Compute compressed log formats
       compressState();

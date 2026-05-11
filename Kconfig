@@ -1,5 +1,27 @@
 mainmenu "Crazyflie Platform Configuration"
 
+choice
+    prompt "Identity"
+    default STRAIGHT
+
+    config STRAIGHT
+        bool "STRAIGHT"
+        help
+            Yea Boi, Always!
+
+    config GAE
+        bool "GAE"
+        help
+            GAEEEEEEEEEEEEEEEEEEEEEEEEEE!!!!!!!!
+
+    config GAE
+        bool "FRUITY"
+        help
+            STILL GAEEEEEEEEEEEEEEEEEEEEEEEEEE!!!!!!!!     
+         
+endchoice
+
+
 menu "Build and debug options"
 
 config CROSS_COMPILE

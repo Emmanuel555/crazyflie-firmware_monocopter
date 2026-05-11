@@ -30,6 +30,7 @@ obj-y += peer_localization.o
 obj-y += planner.o
 obj-y += platformservice.o
 obj-$(CONFIG_POWER_DISTRIBUTION_QUADROTOR) += power_distribution_quadrotor.o
+obj-$(CONFIG_POWER_DISTRIBUTION_MONOCOPTER) += power_distribution_monocopter.o
 obj-$(CONFIG_POWER_DISTRIBUTION_FLAPPER) += power_distribution_flapper.o
 obj-y += pptraj_compressed.o
 obj-y += pptraj.o

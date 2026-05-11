@@ -135,7 +135,7 @@ menu "Motor configuration"
 
 choice
     prompt "ESC protocol"
-    default MOTORS_ESC_PROTOCOL_ONESHOT125
+    default MOTORS_ESC_PROTOCOL_DSHOT
 
 	config MOTORS_ESC_PROTOCOL_STANDARD_PWM
 	    bool "Standard PWM"
@@ -146,7 +146,7 @@ choice
 	config MOTORS_ESC_PROTOCOL_ONESHOT42
 	    bool "OneShot42"
 
-  config MOTORS_ESC_PROTOCOL_DSHOT
+    config MOTORS_ESC_PROTOCOL_DSHOT
       bool "Digital DSHOT protocol"
 
 endchoice
@@ -170,9 +170,9 @@ endchoice
 config MOTORS_ESC_PROTOCOL_DSHOT_BIDIRECTIONAL
   bool "Enable bi-directional DSHOT (RPM measurements)"
   depends on MOTORS_ESC_PROTOCOL_DSHOT
-  default y
+  default n
     help
-        This requires 300 kHz DHOT PWM to work with Bluejay ESC FW.
+        This requires 300 kHz DHOT PWM to work with Bluejay ESC Firmware.
         
 config MOTORS_NBR_OF_POLES
   int "Number of poles on the brushless motors"
@@ -226,20 +226,28 @@ config MOTORS_DEFAULT_BAT_TEST_PWM_RATIO
 
 choice
     prompt "Type of power distribution"
-    default POWER_DISTRIBUTION_QUADROTOR
+    default POWER_DISTRIBUTION_MONOCOPTER
 
-config POWER_DISTRIBUTION_QUADROTOR
-    bool "Quadrotor power distribution"
-    depends on PLATFORM_CF2 || PLATFORM_CF21BL|| PLATFORM_BOLT || PLATFORM_TAG
-    help
-        Power distribution function for quadrotors
-config POWER_DISTRIBUTION_FLAPPER
-    bool "Flapper Nimble+ power distribution"
-    depends on PLATFORM_FLAPPER
-    help
-        Power distribution function for Flapper Nimble+
+    config POWER_DISTRIBUTION_QUADROTOR
+        bool "Quadrotor power distribution"
+        depends on PLATFORM_CF2 || PLATFORM_CF21BL|| PLATFORM_BOLT || PLATFORM_TAG
+        help
+            Power distribution function for quadrotors
+
+    config POWER_DISTRIBUTION_MONOCOPTER
+        bool "Monocopter power distribution"
+        depends on PLATFORM_BOLT
+        help
+            Power distribution function for monocopters        
+
+    config POWER_DISTRIBUTION_FLAPPER
+        bool "Flapper Nimble+ power distribution"
+        depends on PLATFORM_FLAPPER
+        help
+            Power distribution function for Flapper Nimble+
 
 endchoice
+
 config POWER_DISTRIBUTION_FLAPPER_REVB
     bool "Flapper  Nimble+ power distribution (PCB revision B)"
     depends on POWER_DISTRIBUTION_FLAPPER
@@ -277,3 +285,4 @@ config DEFRAG_STORAGE_ON_STARTUP
         fragmentation level.
 
 endmenu
+
