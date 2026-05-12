@@ -60,6 +60,9 @@ static uint16_t motorPowerSet[] = {0, 0, 0, 0}; // user-requested PWM signals (o
 static uint16_t motor_ratios[] = {0, 0, 0, 0};  // actual PWM signals
 static uint16_t timPolarity;
 
+static uint8_t motorDirection = 0;    // 0 = forward, 1 = reverse — write from Python to flip instantly
+static uint8_t motor3dModeEnabled = 1;
+
 #ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT
 static DMA_InitTypeDef DMA_InitStructureShare;
 // Memory buffer for DSHOT bits
@@ -612,10 +615,20 @@ static void motorsPrepareDshot(uint32_t id, uint16_t ratio)
 
   // Scale 16 -> 11 bits
   dshotRatio = (ratio >> 5);
-  // Remove command area of DSHOT
-  if (dshotRatio < (DSHOT_MIN_THROTTLE - 1))
-  {
-    dshotRatio = 0;
+
+  if (motor3dModeEnabled && dshotRatio > 0) { // emma edits
+    if (motorDirection == 0) {
+      // Forward: map [1, 2047] → [1049, 2047]
+      dshotRatio = 1049 + (uint16_t)((uint32_t)(dshotRatio - 1) * 998 / 2046);
+    } else {
+      // Reverse: map [1, 2047] → [48, 1047]
+      dshotRatio = 48 + (uint16_t)((uint32_t)(dshotRatio - 1) * 999 / 2046);
+    }
+  } else if (!motor3dModeEnabled) {
+    if (dshotRatio < (DSHOT_MIN_THROTTLE - 1))
+    {
+      dshotRatio = 0;
+    }
   }
 
   dshotBits = (dshotRatio << 1) | (dshot_telemetry ? 1 : 0);
@@ -1050,6 +1063,13 @@ PARAM_ADD_CORE(PARAM_UINT16, m3, &motorPowerSet[2])
 PARAM_ADD_CORE(PARAM_UINT16, m4, &motorPowerSet[3])
 
 PARAM_GROUP_STOP(motorPowerSet)
+
+PARAM_GROUP_START(motorDir)
+/**
+ * @brief 0 = forward (DSHOT 1049-2047), 1 = reverse (DSHOT 48-1047). Only active when 3D mode is enabled.
+ */
+PARAM_ADD_CORE(PARAM_UINT8, direction, &motorDirection)
+PARAM_GROUP_STOP(motorDir)
 
 /**
  * Motor output related log variables.
