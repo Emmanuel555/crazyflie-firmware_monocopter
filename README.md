@@ -23,8 +23,11 @@ ESC - Flash to Bluejay esc firmware using esc configurator (online)
     - Connect via USB cable to com for serial connection and turn on bolt
     - Flash with PWM freq of 24khz for 300 khz DSHOT protocol
     - Flash with forward/reverse direction (Bidirectional 3D Mode)
+    - **Demag Compensation (default is low) set to high
+    - **Brakes on stop (default is NOT selected) set to selected
+    - **Set timing to (default is Medium High) low
     - Write settings at the bottom next to read settings 
-
+    
 
 # Bolt firmware flashing:
 DISABLE the following cos NO telem provided...
