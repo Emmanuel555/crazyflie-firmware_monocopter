@@ -20,7 +20,7 @@ Adds weight and complexity
 Firmware - DSHOT Stable Tag
 ESC - Flash to Bluejay esc firmware using esc configurator (online)
     - Connect battery to bolt and turn it off
-    - Connect via USB cable to com for serial connection
+    - Connect via USB cable to com for serial connection and turn on bolt
     - Flash with PWM freq of 24khz for 300 khz DSHOT protocol
     - Flash with forward/reverse direction (Bidirectional 3D Mode)
     - Write settings at the bottom next to read settings 
