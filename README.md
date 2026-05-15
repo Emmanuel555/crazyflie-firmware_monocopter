@@ -1,24 +1,25 @@
 # Monocopter Ver
 
 # DSHOT 3D mode (current setup)✓✓✓
-Direction flip is instant — just a param write, next DSHOT frame uses the other band
-Half the throttle resolution (~999 steps per direction)
-Requires ESC firmware support (Bluejay ✓)
+1. Direction flip is instant — just a param write, next DSHOT frame uses the other band
+2. Half the throttle resolution (~999 steps per direction)
+3. Requires ESC firmware support (Bluejay ✓)
+4. Threshold wo motor fking up increased
 
-# motorsSetDirection (the old approach we deleted)
-Permanently reprograms ESC direction — 420ms stop + command sequence every flip
-Full throttle resolution (1999 steps)
-Motor stops completely during the flip
-Totally unusable for frequent direction changes
+# MotorsSetDirection (the old approach we deleted)
+1. Permanently reprograms ESC direction — 420ms stop + command sequence every flip
+2. Full throttle resolution (1999 steps)
+3. Motor stops completely during the flip
+4. Totally unusable for frequent direction changes
 
 # Wiring two ESCs/motors in opposite directions
-Hardware solution, no software switching at all
-Adds weight and complexity
+1. Hardware solution, no switching in Bolt FCU firmware at all
+2. Adds weight and complexity
 
 
 # Installation:
-Firmware - DSHOT Stable Tag
-ESC - Flash to Bluejay esc firmware using esc configurator (online)
+1. Firmware - DSHOT Stable Tag
+2. ESC - Flash to Bluejay esc firmware using esc configurator (online)
     - Connect battery to bolt and turn it off
     - Connect via USB cable to com for serial connection and turn on bolt
     - Flash with PWM freq of 24khz for 300 khz DSHOT protocol
