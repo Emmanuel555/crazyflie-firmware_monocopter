@@ -8,11 +8,13 @@
 #include "controller_indi.h"
 #include "controller_brescianini.h"
 #include "controller_lee.h"
+#include "controller_sam_emma.h"
 
 #include "autoconf.h"
 
 //#define DEFAULT_CONTROLLER ControllerTypePID // added
-#define DEFAULT_CONTROLLER ControllerTypeINDI // added
+//#define DEFAULT_CONTROLLER ControllerTypeINDI // added
+#define DEFAULT_CONTROLLER ControllerTypeSamEmma // added
 static ControllerType currentController = ControllerTypeAutoSelect;
 
 static void initController();
@@ -31,6 +33,7 @@ static ControllerFcns controllerFunctions[] = {
   {.init = controllerINDIInit, .test = controllerINDITest, .update = controllerINDI, .name = "INDI"},
   {.init = controllerBrescianiniInit, .test = controllerBrescianiniTest, .update = controllerBrescianini, .name = "Brescianini"},
   {.init = controllerLeeFirmwareInit, .test = controllerLeeFirmwareTest, .update = controllerLeeFirmware, .name = "Lee"},
+  {.init = sam_controllerINDIInit, .test = sam_controllerINDITest, .update = sam_controllerINDI, .name = "SAM_EMMA"},
   #ifdef CONFIG_CONTROLLER_OOT
   {.init = controllerOutOfTreeInit, .test = controllerOutOfTreeTest, .update = controllerOutOfTree, .name = "OutOfTree"},
   #endif
