@@ -704,7 +704,7 @@ LOG_GROUP_STOP(gyroSec)
 #endif
 
 /**
- * Log group for magnetometer.
+ * Log group for magnetometer. // even if we can get indoors ver, still not reliable LOL
  *
  * Currently only present on Crazyflie 2.0
  */
