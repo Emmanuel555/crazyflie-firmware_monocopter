@@ -375,6 +375,134 @@ static const MotorPerifDef MOTORS_PB10_TIM2_CH3_BRUSHLESS_PP =
     .DMA_ITFlag_TC = DMA_FLAG_TCIF1,
 };
 
+// Bolt 1.1 M1, PA1, TIM2_CH2, Brushless open-drain for bidirectional DSHOT (Edited in)
+static const MotorPerifDef MOTORS_PA1_TIM2_CH2_BRUSHLESS_OD_BOLT =
+{
+    .drvType       = BRUSHLESS,
+    .gpioPerif     = RCC_AHB1Periph_GPIOA,
+    .gpioPort      = GPIOA,
+    .gpioPin       = GPIO_Pin_1,
+    .gpioPinSource = GPIO_PinSource1,
+    .gpioOType     = GPIO_OType_OD,
+    .gpioAF        = GPIO_AF_TIM2,
+    .gpioPowerswitchPerif = RCC_AHB1Periph_GPIOA,
+    .gpioPowerswitchPort  = GPIOA,
+    .gpioPowerswitchPin   = GPIO_Pin_0,
+    .timPerif      = RCC_APB1Periph_TIM2,
+    .tim           = TIM2,
+    .timPolarity   = TIM_OCPolarity_High,
+    .timDbgStop    = DBGMCU_TIM2_STOP,
+    .timPeriod     = MOTORS_BL_PWM_PERIOD,
+    .timPrescaler  = MOTORS_BL_PWM_PRESCALE,
+    .timChannel    = TIM_Channel_2,
+    .setCompare    = TIM_SetCompare2,
+    .getCompare    = TIM_GetCapture2,
+    .ocInit        = TIM_OC2Init,
+    .preloadConfig = TIM_OC2PreloadConfig,
+    .DMA_stream    = DMA1_Stream6,
+    .DMA_Channel   = DMA_Channel_3,
+    .DMA_PerifAddr = (uint32_t)&TIM2->CCR2,
+    .TIM_DMASource = TIM_DMA_CC2,
+    .DMA_IRQChannel = DMA1_Stream6_IRQn,
+    .DMA_ITFlag_TC = DMA_FLAG_TCIF6,
+};
+
+// Bolt 1.1 M2, PB11, TIM2_CH4, Brushless open-drain for bidirectional DSHOT (Edited in)
+static const MotorPerifDef MOTORS_PB11_TIM2_CH4_BRUSHLESS_OD_BOLT =
+{
+    .drvType       = BRUSHLESS,
+    .gpioPerif     = RCC_AHB1Periph_GPIOB,
+    .gpioPort      = GPIOB,
+    .gpioPin       = GPIO_Pin_11,
+    .gpioPinSource = GPIO_PinSource11,
+    .gpioOType     = GPIO_OType_OD,
+    .gpioAF        = GPIO_AF_TIM2,
+    .gpioPowerswitchPerif = RCC_AHB1Periph_GPIOB,
+    .gpioPowerswitchPort  = GPIOB,
+    .gpioPowerswitchPin   = GPIO_Pin_12,
+    .timPerif      = RCC_APB1Periph_TIM2,
+    .tim           = TIM2,
+    .timPolarity   = TIM_OCPolarity_High,
+    .timDbgStop    = DBGMCU_TIM2_STOP,
+    .timPeriod     = MOTORS_BL_PWM_PERIOD,
+    .timPrescaler  = MOTORS_BL_PWM_PRESCALE,
+    .timChannel    = TIM_Channel_4,
+    .setCompare    = TIM_SetCompare4,
+    .getCompare    = TIM_GetCapture4,
+    .ocInit        = TIM_OC4Init,
+    .preloadConfig = TIM_OC4PreloadConfig,
+    .DMA_stream    = DMA1_Stream7,
+    .DMA_Channel   = DMA_Channel_3,
+    .DMA_PerifAddr = (uint32_t)&TIM2->CCR4,
+    .TIM_DMASource = TIM_DMA_CC4,
+    .DMA_IRQChannel = DMA1_Stream7_IRQn,
+    .DMA_ITFlag_TC = DMA_FLAG_TCIF7,
+};
+
+// Bolt 1.1 M3, PA15, TIM2_CH1, Brushless open-drain for bidirectional DSHOT (Edited in)
+static const MotorPerifDef MOTORS_PA15_TIM2_CH1_BRUSHLESS_OD_BOLT =
+{
+    .drvType       = BRUSHLESS,
+    .gpioPerif     = RCC_AHB1Periph_GPIOA,
+    .gpioPort      = GPIOA,
+    .gpioPin       = GPIO_Pin_15,
+    .gpioPinSource = GPIO_PinSource15,
+    .gpioOType     = GPIO_OType_OD,
+    .gpioAF        = GPIO_AF_TIM2,
+    .gpioPowerswitchPerif = RCC_AHB1Periph_GPIOC,
+    .gpioPowerswitchPort  = GPIOC,
+    .gpioPowerswitchPin   = GPIO_Pin_8,
+    .timPerif      = RCC_APB1Periph_TIM2,
+    .tim           = TIM2,
+    .timPolarity   = TIM_OCPolarity_High,
+    .timDbgStop    = DBGMCU_TIM2_STOP,
+    .timPeriod     = MOTORS_BL_PWM_PERIOD,
+    .timPrescaler  = MOTORS_BL_PWM_PRESCALE,
+    .timChannel    = TIM_Channel_1,
+    .setCompare    = TIM_SetCompare1,
+    .getCompare    = TIM_GetCapture1,
+    .ocInit        = TIM_OC1Init,
+    .preloadConfig = TIM_OC1PreloadConfig,
+    .DMA_stream    = DMA1_Stream5,
+    .DMA_Channel   = DMA_Channel_3,
+    .DMA_PerifAddr = (uint32_t)&TIM2->CCR1,
+    .TIM_DMASource = TIM_DMA_CC1,
+    .DMA_IRQChannel = DMA1_Stream5_IRQn,
+    .DMA_ITFlag_TC = DMA_FLAG_TCIF5,
+};
+
+// Bolt 1.1 M4, PB10, TIM2_CH3, Brushless open-drain for bidirectional DSHOT (Edited in)
+static const MotorPerifDef MOTORS_PB10_TIM2_CH3_BRUSHLESS_OD_BOLT =
+{
+    .drvType       = BRUSHLESS,
+    .gpioPerif     = RCC_AHB1Periph_GPIOB,
+    .gpioPort      = GPIOB,
+    .gpioPin       = GPIO_Pin_10,
+    .gpioPinSource = GPIO_PinSource10,
+    .gpioOType     = GPIO_OType_OD,
+    .gpioAF        = GPIO_AF_TIM2,
+    .gpioPowerswitchPerif = RCC_AHB1Periph_GPIOC,
+    .gpioPowerswitchPort  = GPIOC,
+    .gpioPowerswitchPin   = GPIO_Pin_15,
+    .timPerif      = RCC_APB1Periph_TIM2,
+    .tim           = TIM2,
+    .timPolarity   = TIM_OCPolarity_High,
+    .timDbgStop    = DBGMCU_TIM2_STOP,
+    .timPeriod     = MOTORS_BL_PWM_PERIOD,
+    .timPrescaler  = MOTORS_BL_PWM_PRESCALE,
+    .timChannel    = TIM_Channel_3,
+    .setCompare    = TIM_SetCompare3,
+    .getCompare    = TIM_GetCapture3,
+    .ocInit        = TIM_OC3Init,
+    .preloadConfig = TIM_OC3PreloadConfig,
+    .DMA_stream    = DMA1_Stream1,
+    .DMA_Channel   = DMA_Channel_3,
+    .DMA_PerifAddr = (uint32_t)&TIM2->CCR3,
+    .TIM_DMASource = TIM_DMA_CC3,
+    .DMA_IRQChannel = DMA1_Stream1_IRQn,
+    .DMA_ITFlag_TC = DMA_FLAG_TCIF1,
+};
+
 // CF21-BL M1, PA1, TIM2_CH2, Brushless config including DSHOT
 static const MotorPerifDef MOTORS_PA1_TIM2_CH2_BRUSHLESS_OD =
 {
@@ -786,6 +914,17 @@ const MotorPerifDef* motorMapBolt11Brushless[NBR_OF_MOTORS] =
   &MOTORS_PB11_TIM2_CH4_BRUSHLESS_PP,
   &MOTORS_PA15_TIM2_CH1_BRUSHLESS_PP,
   &MOTORS_PB10_TIM2_CH3_BRUSHLESS_PP
+};
+
+/**
+ * Brushless motors mapped to the Bolt 1.1 PWM outputs, open-drain for bidirectional DSHOT.
+ */
+const MotorPerifDef* motorMapBolt11BrushlessOD[NBR_OF_MOTORS] =
+{
+  &MOTORS_PA1_TIM2_CH2_BRUSHLESS_OD_BOLT,
+  &MOTORS_PB11_TIM2_CH4_BRUSHLESS_OD_BOLT,
+  &MOTORS_PA15_TIM2_CH1_BRUSHLESS_OD_BOLT,
+  &MOTORS_PB10_TIM2_CH3_BRUSHLESS_OD_BOLT
 };
 
 /**

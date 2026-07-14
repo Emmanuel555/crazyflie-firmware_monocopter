@@ -286,6 +286,9 @@ void motorsInit(const MotorPerifDef** motorMapSelect)
     GPIO_InitStructure.GPIO_Mode = MOTORS_GPIO_MODE;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
     GPIO_InitStructure.GPIO_OType = motorMap[i]->gpioOType;
+#ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT_BIDIRECTIONAL
+    GPIO_InitStructure.GPIO_PuPd = (motorMap[i]->gpioOType == GPIO_OType_OD) ? GPIO_PuPd_UP : GPIO_PuPd_NOPULL;
+#endif
     GPIO_InitStructure.GPIO_Pin = motorMap[i]->gpioPin;
     GPIO_Init(motorMap[i]->gpioPort, &GPIO_InitStructure);
 

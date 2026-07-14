@@ -58,6 +58,8 @@ static platformConfig_t configs[] = {
     .physicalLayoutAntennasAreClose = false,
   #ifdef CONFIG_BOLT11_BRUSHED
     .motorMap = motorMapBolt11Brushed,
+  #elif defined(CONFIG_MOTORS_ESC_PROTOCOL_DSHOT_BIDIRECTIONAL)
+    .motorMap = motorMapBolt11BrushlessOD,
   #else
     .motorMap = motorMapBolt11Brushless,
   #endif
