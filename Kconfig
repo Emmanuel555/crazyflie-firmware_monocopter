@@ -232,6 +232,16 @@ config SENSORS_BMI088_I2C
     help
         Include support using I2C with the Bosch bmi088 inertial sensor
 
+config GYRO_BIAS_LIGHT_WEIGHT
+    bool "Lightweight gyro bias calibration (no variance check)"
+    default n
+    help
+        Use a simple mean over 1000 samples for gyro bias calibration instead
+        of the variance-based method. Calibration completes in ~1 second
+        regardless of motion. Useful when the drone cannot be held still
+        during startup (e.g. monocopter). Bias estimate may be less accurate
+        if the drone is moving during calibration.
+
 endmenu
 
 source src/hal/src/Kconfig

@@ -78,6 +78,9 @@
 
 #define GYRO_NBR_OF_AXES                3
 #define GYRO_MIN_BIAS_TIMEOUT_MS        M2T(1*1000)
+#ifdef CONFIG_GYRO_BIAS_LIGHT_WEIGHT
+#define GYRO_BIAS_LIGHT_WEIGHT
+#endif
 
 // Number of samples used in variance calculation. Changing this effects the threshold
 #define SENSORS_NBR_OF_BIAS_SAMPLES  512
@@ -159,17 +162,21 @@ static float sinPitch;
 static float cosRoll;
 static float sinRoll;
 
-#ifdef GYRO_GYRO_BIAS_LIGHT_WEIGHT
+#ifdef GYRO_BIAS_LIGHT_WEIGHT
 static bool processGyroBiasNoBuffer(int16_t gx, int16_t gy, int16_t gz, Axis3f *gyroBiasOut);
 #else
 static bool processGyroBias(int16_t gx, int16_t gy, int16_t gz,  Axis3f *gyroBiasOut);
 #endif
 static bool processAccScale(int16_t ax, int16_t ay, int16_t az);
 static void sensorsBiasObjInit(BiasObj* bias);
+#ifndef GYRO_BIAS_LIGHT_WEIGHT
 static void sensorsCalculateVarianceAndMean(BiasObj* bias, Axis3f* varOut, Axis3f* meanOut);
+#endif
 static void sensorsCalculateBiasMean(BiasObj* bias, Axis3i32* meanOut);
+#ifndef GYRO_BIAS_LIGHT_WEIGHT
 static void sensorsAddBiasValue(BiasObj* bias, int16_t x, int16_t y, int16_t z);
 static bool sensorsFindBiasValue(BiasObj* bias);
+#endif
 static void sensorsAlignToAirframe(Axis3f* in, Axis3f* out);
 static void sensorsAccAlignToGravity(Axis3f* in, Axis3f* out);
 
@@ -705,7 +712,9 @@ static bool processGyroBiasNoBuffer(int16_t gx, int16_t gy, int16_t gz, Axis3f *
   static uint32_t gyroBiasSampleCount = 0;
   static bool gyroBiasNoBuffFound = false;
   static Axis3i64 gyroBiasSampleSum;
+#ifdef SENSORS_GYRO_BIAS_CALCULATE_STDDEV
   static Axis3i64 gyroBiasSampleSumSquares;
+#endif
 
   if (!gyroBiasNoBuffFound)
   {
@@ -772,6 +781,7 @@ static void sensorsBiasObjInit(BiasObj* bias)
   bias->bufHead = bias->buffer;
 }
 
+#ifndef GYRO_BIAS_LIGHT_WEIGHT
 /**
  * Calculates the variance and mean for the bias buffer.
  */
@@ -799,6 +809,7 @@ static void sensorsCalculateVarianceAndMean(BiasObj* bias, Axis3f* varOut, Axis3
   varOut->y = sumSq[1] / SENSORS_NBR_OF_BIAS_SAMPLES - meanOut->y * meanOut->y;
   varOut->z = sumSq[2] / SENSORS_NBR_OF_BIAS_SAMPLES - meanOut->z * meanOut->z;
 }
+#endif // GYRO_BIAS_LIGHT_WEIGHT
 
 /**
  * Calculates the mean for the bias buffer.
@@ -820,6 +831,7 @@ static void __attribute__((used)) sensorsCalculateBiasMean(BiasObj* bias, Axis3i
   meanOut->z = sum[2] / SENSORS_NBR_OF_BIAS_SAMPLES;
 }
 
+#ifndef GYRO_BIAS_LIGHT_WEIGHT
 /**
  * Adds a new value to the variance buffer and if it is full
  * replaces the oldest one. Thus a circular buffer.
@@ -868,6 +880,7 @@ static bool sensorsFindBiasValue(BiasObj* bias)
 
   return foundBias;
 }
+#endif // GYRO_BIAS_LIGHT_WEIGHT
 
 bool sensorsBmi088Bmp3xxManufacturingTest(void)
 {
