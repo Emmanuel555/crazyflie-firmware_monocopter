@@ -19,7 +19,15 @@
 
 # Installation:
 1. Firmware - DSHOT Stable Tag
-2. ESC - Flash to Bluejay esc firmware using esc configurator (online)
+2. (Safest choice) ESC - Flash to BLHeli_S - v16.7 using esc configurator (online) 
+    - Forward/Reverse (3D Mode)
+        - Troubleshooting:
+         - try reverse, then 3D mode in reverse, for some reason it works for now...
+    - Connect battery to bolt and turn it off
+    - Connect via USB cable to com for serial connection and turn on bolt
+    - Thats it, dun touch any of the common params
+3. (Not suitable w flight controller...till further notice....)
+   ESC - Flash to Bluejay esc firmware using esc configurator (online)
     - Connect battery to bolt and turn it off
     - Connect via USB cable to com for serial connection and turn on bolt
     - Flash with PWM freq of 24khz for 300 khz DSHOT protocol
